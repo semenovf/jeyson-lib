@@ -20,6 +20,11 @@ using error_code = std::error_code;
 enum class errc
 {
       success = 0
+
+// Parser errors
+    , unquoted_string
+    , bad_escaped_char
+    , bad_encoded_char
 };
 
 class error_category : public std::error_category
@@ -35,6 +40,12 @@ public:
         switch (ev) {
             case static_cast<int>(errc::success):
                 return std::string{"no error"};
+            case static_cast<int>(errc::unquoted_string):
+                return std::string{"unquoted string"};
+            case static_cast<int>(errc::bad_escaped_char):
+                return std::string{"bad escaped char"};
+            case static_cast<int>(errc::bad_encoded_char):
+                return std::string{"bad encoded char"};
 
             default: return std::string{"unknown JSON error"};
         }
@@ -55,6 +66,18 @@ inline std::error_code make_error_code (errc e)
 ////////////////////////////////////////////////////////////////////////////////
 // value: general JSON class
 ////////////////////////////////////////////////////////////////////////////////
+
+enum class value_type
+{
+      null = 0
+    , boolean
+    , integer
+    , real
+    , string
+    , object
+    , array
+};
+
 class value {};
 
 }} // // namespace pfs::json

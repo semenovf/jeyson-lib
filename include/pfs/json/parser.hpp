@@ -16,6 +16,7 @@
 // #include <limits>
 // #include <map>
 // #include <string>
+#include <type_traits>
 #include <utility>
 // #include <cerrno>
 // #include <cstdlib>
@@ -163,6 +164,12 @@ enum parse_policy_flag {
     , allow_boolean_root_element
     , allow_null_root_element
 
+    //
+    , allow_single_quote_mark
+
+    // Allow any escaped character in string not only permitted by grammar
+    , allow_any_char_escaped
+
     // Clarification:
     // Compare original 'number' grammar with modified:
     // Original:
@@ -208,9 +215,7 @@ inline parse_policy_set rfc7159_policy ()
 inline parse_policy_set json5_policy ()
 {
     parse_policy_set result = rfc7159_policy();
-
-    // TODO Add JSON5 specific policies here
-
+    result.set(allow_single_quote_mark, true);
     return result;
 }
 
@@ -227,16 +232,27 @@ inline parse_policy_set strict_policy ()
 ////////////////////////////////////////////////////////////////////////////////
 inline parse_policy_set relaxed_policy ()
 {
-    parse_policy_set result = rfc7159_policy();
+    parse_policy_set result = json5_policy();
     result.set(allow_positive_signed_number, true);
+    result.set(allow_any_char_escaped, true);
     return result;
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// String context
+////////////////////////////////////////////////////////////////////////////////
+template <typename ForwardIterator, typename OutputIterator>
+struct string_context
+{
+    range<ForwardIterator> original; // Represents original sequence excluding quotation marks
+    OutputIterator output;           // Output iterator for parsed string
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Number context
 ////////////////////////////////////////////////////////////////////////////////
 template <typename ForwardIterator>
-struct number
+struct number_context
 {
     int sign = 1;
     int exp_sign = 1;
@@ -333,6 +349,48 @@ inline bool is_hexdigit (CharT ch)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+//
+////////////////////////////////////////////////////////////////////////////////
+/**
+ * @return Base-@a radix digit converted from character @a ch,
+ *      or -1 if conversion is impossible. @a radix must be between 2 and 36
+ *      inclusive.
+ */
+template <typename CharT>
+int to_digit (CharT ch, int radix = 10)
+{
+    int digit = 0;
+
+    // Bad radix
+    if (radix < 2 || radix > 36)
+        return -1;
+
+    if (int(ch) >= int('0') && int(ch) <= int('9'))
+        digit = int(ch) - int('0');
+    else if (int(ch) >= int('a') && int(ch) <= int('z'))
+        digit = int(ch) - int('a') + 10;
+    else if (int(ch) >= int('A') && int(ch) <= int('Z'))
+        digit = int(ch) - int('A') + 10;
+    else
+        return -1;
+
+    if (digit >= radix)
+        return -1;
+
+    return digit;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// is_quotation_mark
+////////////////////////////////////////////////////////////////////////////////
+template <typename CharT>
+inline bool is_quotation_mark (CharT ch, parse_policy_set const & parse_policy)
+{
+    return (ch == '"'
+            || (parse_policy.test(allow_single_quote_mark) && ch == '\''));
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // advance_whitespaces
 ////////////////////////////////////////////////////////////////////////////////
 /**
@@ -354,17 +412,282 @@ bool advance_whitespaces (ForwardIterator & pos, ForwardIterator last)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// advance_number
+// advance_sequence
+// Based on pfs/algo/advance.hpp:advance_sequence
 ////////////////////////////////////////////////////////////////////////////////
 /**
- * @brief Advance by number.
- *
+ * @brief Advance by sequence of charcters.
+ * @param pos On input - first position, on output - last good position.
+ * @param last End of sequence position.
+ * @return @c true if advanced by all character sequence [first2, last2),
+ *      otherwise returns @c false.
+ */
+template <typename ForwardIterator1, typename ForwardIterator2>
+inline bool advance_sequence (ForwardIterator1 & pos, ForwardIterator1 last
+        , ForwardIterator2 first2, ForwardIterator2 last2)
+{
+    ForwardIterator1 p = pos;
+
+    while (p != last && first2 != last2 && *p++ == *first2++)
+        ;
+
+    if (first2 == last2) {
+        pos = p;
+        return true;
+    }
+
+    return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// advance_null
+////////////////////////////////////////////////////////////////////////////////
+/**
+ * @brief Advance by 'null' string.
  * @param pos On input - first position, on output - last good position.
  * @param last End of sequence position.
  * @return @c true if advanced by at least one position, otherwise @c false.
  *
  * @note Grammar
+ * null  = %x6e.75.6c.6c      ; null
+ */
+template <typename ForwardIterator>
+inline bool advance_null (ForwardIterator & pos, ForwardIterator last)
+{
+    std::string s{"null"};
+    return advance_sequence(pos, last, s.begin(), s.end());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// advance_true
+////////////////////////////////////////////////////////////////////////////////
+/**
+ * @brief Advance by 'true' string.
+ * @param pos On input - first position, on output - last good position.
+ * @param last End of sequence position.
+ * @return @c true if advanced by at least one position, otherwise @c false.
  *
+ * @note Grammar
+ * true  = %x74.72.75.65      ; true
+ */
+template <typename ForwardIterator>
+inline bool advance_true (ForwardIterator & pos, ForwardIterator last)
+{
+    std::string s{"true"};
+    return advance_sequence(pos, last, s.begin(), s.end());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// advance_false
+////////////////////////////////////////////////////////////////////////////////
+/**
+ * @brief Advance by 'false' string.
+ * @param pos On input - first position, on output - last good position.
+ * @param last End of sequence position.
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ *
+ * @note Grammar
+ * true  = %x74.72.75.65      ; true
+ */
+template <typename ForwardIterator>
+inline bool advance_false (ForwardIterator & pos, ForwardIterator last)
+{
+    std::string s{"false"};
+    return advance_sequence(pos, last, s.begin(), s.end());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// advance_encoded_char
+////////////////////////////////////////////////////////////////////////////////
+/**
+ * @note Grammar:
+ * encoded_char = 4HEXDIG
+ */
+template <typename ForwardIterator>
+bool advance_encoded_char (ForwardIterator & pos, ForwardIterator last
+        , int32_t * result = nullptr)
+{
+    static int32_t multipliers[] = { 16 * 16 * 16, 16 * 16, 16, 1 };
+    static int count = sizeof(multipliers) / sizeof(multipliers[0]);
+    ForwardIterator p = pos;
+    int index = 0;
+
+    if (result)
+        *result = 0;
+
+    for (p = pos; p != last && is_hexdigit(*p) && index < count; ++p, ++index) {
+        if (result) {
+            int32_t n = to_digit(*p, 16);
+            *result += n * multipliers[index];
+        }
+    }
+
+    if (index != count)
+        return false;
+
+    return compare_and_assign(pos, p);
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// advance_string
+////////////////////////////////////////////////////////////////////////////////
+/**
+ * @brief Advance by string.
+ * @param pos On input - first position, on output - last good position.
+ * @param last End of sequence position.
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ *
+ * @note Grammar
+ *  string = quotation-mark *char quotation-mark
+ *
+ *  char = unescaped /
+ *      escape (
+ *          %x22 /          ; "    quotation mark  U+0022
+ *          %x5C /          ; \    reverse solidus U+005C
+ *          %x2F /          ; /    solidus         U+002F
+ *          %x62 /          ; b    backspace       U+0008
+ *          %x66 /          ; f    form feed       U+000C
+ *          %x6E /          ; n    line feed       U+000A
+ *          %x72 /          ; r    carriage return U+000D
+ *          %x74 /          ; t    tab             U+0009
+ *          %x75 4HEXDIG )  ; uXXXX                U+XXXX
+ *
+ *  escape = %x5C              ; \
+ *  quotation-mark = %x22      ; "
+ *      / %x27                 ; '  JSON5 specific
+ *  unescaped = %x20-21 / %x23-5B / %x5D-10FFFF
+ */
+template <typename ForwardIterator, typename OutputIterator>
+inline bool advance_string (ForwardIterator & pos, ForwardIterator last
+        , parse_policy_set const & parse_policy
+        , string_context<ForwardIterator, OutputIterator> * ctx
+        , error_code & ec)
+{
+    using char_type = typename std::remove_reference<decltype(*pos)>::type;
+
+    ForwardIterator p = pos;
+
+    if (p == last)
+        return false;
+
+    if (!is_quotation_mark(*p, parse_policy))
+        return false;
+
+    auto quotation_mark = *p;
+
+    ++p;
+
+    if (p == last) {
+        ec = make_error_code(errc::unquoted_string);
+        return false;
+    }
+
+    // Check empty string
+    if (*p == quotation_mark) {
+        if (ctx) {
+            ctx->original.first = p;
+            ctx->original.second = p;
+        }
+
+        ++p;
+        return compare_and_assign(pos, p);
+    }
+
+    ForwardIterator begin_string_pos = p;
+    bool escaped = false;
+    bool encoded = false;
+
+    while (*p != quotation_mark) {
+        // ERROR: unquoted string
+        if (p == last) {
+            ec = make_error_code(errc::unquoted_string);
+            return false;
+        }
+
+        if (encoded) {
+            int32_t encoded_char = 0;
+
+            if (!advance_encoded_char(p, last, & encoded_char)) {
+                ec = make_error_code(errc::bad_encoded_char);
+                return false;
+            }
+
+            if (ctx)
+                *ctx->output++ = char_type(encoded_char);
+
+            encoded = false;
+            continue;
+        }
+
+        if (!escaped) {
+            if (*p == '\\') { // escape character
+                escaped = true;
+            } else {
+                if (ctx)
+                    *ctx->output++ = *p;
+            }
+        } else {
+            auto escaped_char = *p;
+
+            switch (escaped_char) {
+                case '"':
+                case '\\':
+                case '/': break;
+
+                case '\'':
+                    if (quotation_mark != '\'') {
+                        ec = make_error_code(errc::bad_escaped_char);
+                        return false;
+                    }
+                    break;
+
+                case 'b': escaped_char = '\b'; break;
+                case 'f': escaped_char = '\f'; break;
+                case 'n': escaped_char = '\n'; break;
+                case 'r': escaped_char = '\r'; break;
+                case 't': escaped_char = '\t'; break;
+
+                case 'u': encoded = true; break;
+
+                default:
+                    if (!parse_policy.test(allow_any_char_escaped)) {
+                        ec = make_error_code(errc::bad_escaped_char);
+                        return false;
+                    }
+            }
+
+            if (!encoded) {
+                if (ctx)
+                    *ctx->output++ = escaped_char;
+            }
+
+            // Finished process escaped sequence
+            escaped = false;
+        }
+
+        ++p;
+    }
+
+    if (ctx) {
+        ctx->original.first = begin_string_pos;
+        ctx->original.second = p;
+    }
+
+    return compare_and_assign(pos, p);
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// advance_number
+////////////////////////////////////////////////////////////////////////////////
+/**
+ * @brief Advance by number.
+ * @param pos On input - first position, on output - last good position.
+ * @param last End of sequence position.
+ * @return @c true if advanced by at least one position, otherwise @c false.
+ *
+ * @note Grammar
  * number = [ minus ] int [ frac ] [ exp ]
  * decimal-point = %x2E       ; .
  * digit1-9 = %x31-39         ; 1-9
@@ -380,7 +703,7 @@ bool advance_whitespaces (ForwardIterator & pos, ForwardIterator last)
 template <typename ForwardIterator>
 bool advance_number (ForwardIterator & pos, ForwardIterator last
         , parse_policy_set const & parse_policy = strict_policy()
-        , number<ForwardIterator> * num = nullptr)
+        , number_context<ForwardIterator> * num = nullptr)
 {
     ForwardIterator p = pos;
     int sign = 1;
@@ -462,7 +785,7 @@ bool advance_number (ForwardIterator & pos, ForwardIterator last
     last_pos = p;
 
     ////////////////////////////////////////////////////////////////////////////
-    // Exponentional part
+    // Exponential part
     //
     // Optional
     // exp = e [ minus / plus ] 1*DIGIT
@@ -521,6 +844,12 @@ bool advance_json (ForwardIterator & pos, ForwardIterator last
     ForwardIterator p = pos;
 
     do {
+        if (parse_policy.test(allow_null_root_element)
+                && advance_boolean(p, last, val)) {
+//             *val = null_value{};
+            break;
+        }
+
 //         if (parse_policy.test(allow_object_root_element)
 //                 && advance_object(p, last, val))
 //             break;
@@ -528,12 +857,8 @@ bool advance_json (ForwardIterator & pos, ForwardIterator last
 //         if (parse_policy.test(allow_array_root_element)
 //                 && advance_array(p, last, val))
 //             break;
-//
-//         if (parse_policy.test(allow_null_root_element)
-//                 && advance_boolean(p, last, val))
-//             break;
 
-        number<ForwardIterator> num;
+        number_context<ForwardIterator> num;
 
         if (parse_policy.test(allow_number_root_element)
                 && advance_number(p, last, parse_policy, & num)) {
