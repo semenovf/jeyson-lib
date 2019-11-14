@@ -187,15 +187,13 @@ TEST_CASE("advance_encoded_char") {
             ; i < count; i++) {
         auto pos  = data[i].s.begin();
         auto last = data[i].s.end();
-
-        CHECK(advance_encoded_char(pos, last) == data[i].r);
+        int32_t ch;
+        CHECK(advance_encoded_char(pos, last, ch) == data[i].r);
     }
 }
 
 TEST_CASE("advance_string") {
     using pfs::json::advance_string;
-
-    pfs::json::string_context<std::string::iterator, std::string::iterator> * ctx = nullptr;
 
     test_advance_data data[] = {
           { "\"\"", true, pfs::json::strict_policy() }
@@ -205,7 +203,7 @@ TEST_CASE("advance_string") {
         , { "\"unquoted string"
                 , false
                 , pfs::json::strict_policy()
-                , pfs::json::errc::unquoted_string }
+                , pfs::json::errc::unbalanced_quote }
 
         , { "\"good escaped\\\" char\"", true }
         , { "\"good escaped\\\\ char\"", true }
@@ -222,7 +220,9 @@ TEST_CASE("advance_string") {
                 , pfs::json::strict_policy()
                 , pfs::json::errc::bad_escaped_char }
 
-        , { "\"good encoded \\uFFFF char\"" , true }
+        // Use encoded chars from ASCII table as output iterator will use
+        // std::string::iterator to avoid 'SIGSEGV - Segmentation violation signal' (GCC)
+        , { "\"good encoded \\u0020 char\"" , true }
 
         , { "\"bad encoded \\u0 char\""
                 , false
@@ -236,6 +236,8 @@ TEST_CASE("advance_string") {
         auto last = data[i].s.end();
         pfs::json::error_code ec;
 
+        pfs::json::string_context<std::string::iterator, std::string::iterator> ctx;
+
         CHECK(advance_string(pos, last, data[i].parse_policy, ctx, ec) == data[i].r);
         CHECK(ec == data[i].ec);
     }
@@ -243,9 +245,10 @@ TEST_CASE("advance_string") {
 
 TEST_CASE("advance_number") {
     using pfs::json::advance_number;
+    using pfs::json::strict_policy;
 
 //     struct test_data {}
-    static char const * valid_numbers[] = {
+    static std::string valid_numbers[] = {
           "0"
         , "1"
 //         , "+0"
@@ -254,9 +257,10 @@ TEST_CASE("advance_number") {
 
     for (int i = 0, count = sizeof(valid_numbers) / sizeof(valid_numbers[0])
             ; i < count; i++) {
-        auto pos  = valid_numbers[i];
-        auto last = valid_numbers[i] + std::strlen(valid_numbers[i]);
+        auto pos  = valid_numbers[i].begin();
+        auto last = valid_numbers[i].end();
 
-        CHECK(advance_number(pos, last));
+        pfs::json::number_context<std::string::iterator> num_ctx;
+        CHECK(advance_number(pos, last, strict_policy(), num_ctx));
     }
 }

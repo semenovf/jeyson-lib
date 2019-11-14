@@ -8,19 +8,11 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "json.hpp"
-// #include <pfs/algo/advance.hpp>
-// #include <pfs/algo/compare.hpp>
 #include <algorithm>
 #include <bitset>
-// #include <iterator>
-// #include <limits>
-// #include <map>
-// #include <string>
+#include <functional>
 #include <type_traits>
 #include <utility>
-// #include <cerrno>
-// #include <cstdlib>
-// #include <cstdio>
 
 namespace pfs {
 namespace json {
@@ -164,7 +156,7 @@ enum parse_policy_flag {
     , allow_boolean_root_element
     , allow_null_root_element
 
-    //
+    // Allow apostrophe as quotation mark besides double quote
     , allow_single_quote_mark
 
     // Allow any escaped character in string not only permitted by grammar
@@ -505,21 +497,18 @@ inline bool advance_false (ForwardIterator & pos, ForwardIterator last)
  */
 template <typename ForwardIterator>
 bool advance_encoded_char (ForwardIterator & pos, ForwardIterator last
-        , int32_t * result = nullptr)
+        , int32_t & result)
 {
     static int32_t multipliers[] = { 16 * 16 * 16, 16 * 16, 16, 1 };
     static int count = sizeof(multipliers) / sizeof(multipliers[0]);
     ForwardIterator p = pos;
     int index = 0;
 
-    if (result)
-        *result = 0;
+    result = 0;
 
     for (p = pos; p != last && is_hexdigit(*p) && index < count; ++p, ++index) {
-        if (result) {
-            int32_t n = to_digit(*p, 16);
-            *result += n * multipliers[index];
-        }
+        int32_t n = to_digit(*p, 16);
+        result += n * multipliers[index];
     }
 
     if (index != count)
@@ -561,7 +550,7 @@ bool advance_encoded_char (ForwardIterator & pos, ForwardIterator last
 template <typename ForwardIterator, typename OutputIterator>
 inline bool advance_string (ForwardIterator & pos, ForwardIterator last
         , parse_policy_set const & parse_policy
-        , string_context<ForwardIterator, OutputIterator> * ctx
+        , string_context<ForwardIterator, OutputIterator> & string_ctx
         , error_code & ec)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
@@ -579,16 +568,14 @@ inline bool advance_string (ForwardIterator & pos, ForwardIterator last
     ++p;
 
     if (p == last) {
-        ec = make_error_code(errc::unquoted_string);
+        ec = make_error_code(errc::unbalanced_quote);
         return false;
     }
 
     // Check empty string
     if (*p == quotation_mark) {
-        if (ctx) {
-            ctx->original.first = p;
-            ctx->original.second = p;
-        }
+        string_ctx.original.first = p;
+        string_ctx.original.second = p;
 
         ++p;
         return compare_and_assign(pos, p);
@@ -601,20 +588,19 @@ inline bool advance_string (ForwardIterator & pos, ForwardIterator last
     while (*p != quotation_mark) {
         // ERROR: unquoted string
         if (p == last) {
-            ec = make_error_code(errc::unquoted_string);
+            ec = make_error_code(errc::unbalanced_quote);
             return false;
         }
 
         if (encoded) {
             int32_t encoded_char = 0;
 
-            if (!advance_encoded_char(p, last, & encoded_char)) {
+            if (!advance_encoded_char(p, last, encoded_char)) {
                 ec = make_error_code(errc::bad_encoded_char);
                 return false;
             }
 
-            if (ctx)
-                *ctx->output++ = char_type(encoded_char);
+            *string_ctx.output++ = char_type(encoded_char);
 
             encoded = false;
             continue;
@@ -624,8 +610,7 @@ inline bool advance_string (ForwardIterator & pos, ForwardIterator last
             if (*p == '\\') { // escape character
                 escaped = true;
             } else {
-                if (ctx)
-                    *ctx->output++ = *p;
+                *string_ctx.output++ = *p;
             }
         } else {
             auto escaped_char = *p;
@@ -658,8 +643,7 @@ inline bool advance_string (ForwardIterator & pos, ForwardIterator last
             }
 
             if (!encoded) {
-                if (ctx)
-                    *ctx->output++ = escaped_char;
+                *string_ctx.output++ = escaped_char;
             }
 
             // Finished process escaped sequence
@@ -669,10 +653,8 @@ inline bool advance_string (ForwardIterator & pos, ForwardIterator last
         ++p;
     }
 
-    if (ctx) {
-        ctx->original.first = begin_string_pos;
-        ctx->original.second = p;
-    }
+    string_ctx.original.first = begin_string_pos;
+    string_ctx.original.second = p;
 
     return compare_and_assign(pos, p);
 }
@@ -702,8 +684,8 @@ inline bool advance_string (ForwardIterator & pos, ForwardIterator last
  */
 template <typename ForwardIterator>
 bool advance_number (ForwardIterator & pos, ForwardIterator last
-        , parse_policy_set const & parse_policy = strict_policy()
-        , number_context<ForwardIterator> * num = nullptr)
+        , parse_policy_set const & parse_policy
+        , number_context<ForwardIterator> & num_ctx)
 {
     ForwardIterator p = pos;
     int sign = 1;
@@ -745,11 +727,9 @@ bool advance_number (ForwardIterator & pos, ForwardIterator last
     if (p == last_pos)
         return false;
 
-    if (num) {
-        num->integral_part.first = last_pos;
-        num->integral_part.second = p;
-        num->sign = sign;
-    }
+    num_ctx.integral_part.first = last_pos;
+    num_ctx.integral_part.second = p;
+    num_ctx.sign = sign;
 
     last_pos = p;
 
@@ -777,10 +757,8 @@ bool advance_number (ForwardIterator & pos, ForwardIterator last
         }
     }
 
-    if (num) {
-        num->fract_part.first = last_pos;
-        num->fract_part.second = p;
-    }
+    num_ctx.fract_part.first = last_pos;
+    num_ctx.fract_part.second = p;
 
     last_pos = p;
 
@@ -818,16 +796,80 @@ bool advance_number (ForwardIterator & pos, ForwardIterator last
         }
     }
 
-    if (num) {
-        num->exp_part.first = last_pos;
-        num->exp_part.second = p;
-        num->exp_sign = exp_sign;
-    }
+    num_ctx.exp_part.first = last_pos;
+    num_ctx.exp_part.second = p;
+    num_ctx.exp_sign = exp_sign;
 
     return compare_and_assign(pos, p);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// Forward declaration for advance_value
+////////////////////////////////////////////////////////////////////////////////
+template <typename ForwardIterator>
+bool advance_value (ForwardIterator & pos, ForwardIterator last
+        , parse_policy_set const & parse_policy
+        , error_code & ec);
 
+////////////////////////////////////////////////////////////////////////////////
+// advance_array
+////////////////////////////////////////////////////////////////////////////////
+/**
+ *
+ * @note Grammar:
+ * array = begin-array [ value *( value-separator value ) ] end-array
+ * begin-array     = ws %x5B ws  ; [ left square bracket
+ * end-array       = ws %x5D ws  ; ] right square bracket
+ * value-separator = ws %x2C ws  ; , comma
+ * value = false / null / true / object / array / number / string
+ */
+template <typename ForwardIterator>
+bool advance_array (ForwardIterator & pos, ForwardIterator last
+        , parse_policy_set const & parse_policy
+        , error_code & ec)
+{
+    ForwardIterator p = pos;
+
+    // Skip head witespaces
+    advance_whitespaces(p, last);
+
+    if (p == last)
+        return false;
+
+    if (*p != '[')
+        return false;
+
+    ++p;
+
+    // Skip witespaces
+    advance_whitespaces(p, last);
+
+    if (p == last) {
+        ec = make_error_code(errc::unbalanced_array_bracket);
+        return false;
+    }
+
+    if (!advance_value(p, last, parse_policy, ec))
+        return false;
+
+    // Skip witespaces
+    advance_whitespaces(p, last);
+
+    if (p == last) {
+        ec = make_error_code(errc::unbalanced_array_bracket);
+        return false;
+    }
+
+    if (*p != ']') {
+        ec = make_error_code(errc::unbalanced_array_bracket);
+        return false;
+    }
+
+    // Skip tail witespaces
+    advance_whitespaces(p, last);
+
+    return compare_and_assign(pos, p);
+}
 
 // static constexpr char begin_array_char     = '\x5B'; // '[' left square bracket
 // static constexpr char begin_object_char    = '\x7B'; // '{' left curly bracket
@@ -836,36 +878,55 @@ bool advance_number (ForwardIterator & pos, ForwardIterator last
 // static constexpr char name_separator_char  = '\x3A'; // ':' colon
 // static constexpr char value_separator_char = '\x2C'; // ',' comma
 
+////////////////////////////////////////////////////////////////////////////////
+// advance_value
+////////////////////////////////////////////////////////////////////////////////
 template <typename ForwardIterator>
-bool advance_json (ForwardIterator & pos, ForwardIterator last
-        , parse_policy_set const & parse_policy = strict_policy()
-        , value * val = nullptr)
+bool advance_value (ForwardIterator & pos, ForwardIterator last
+        , parse_policy_set const & parse_policy
+        , error_code & ec)
 {
     ForwardIterator p = pos;
 
+    // Skip head witespaces
+    advance_whitespaces(p, last);
+
     do {
-        if (parse_policy.test(allow_null_root_element)
-                && advance_boolean(p, last, val)) {
-//             *val = null_value{};
-            break;
+        if (*p == '[') {
+//         if (parse_policy.test(allow_array_root_element)
+//                 && advance_array(p, last, val))
+//             break;
         }
 
+        if (*p == '{') {
 //         if (parse_policy.test(allow_object_root_element)
 //                 && advance_object(p, last, val))
 //             break;
 //
-//         if (parse_policy.test(allow_array_root_element)
-//                 && advance_array(p, last, val))
-//             break;
+        }
+
+        if (parse_policy.test(allow_null_root_element)
+                && advance_null(p, last)) {
+//             *val = null_value{};
+            break;
+        }
+
+        if (parse_policy.test(allow_boolean_root_element)
+                && advance_true(p, last)) {
+//             *val = null_value{};
+            break;
+        }
+
+        if (parse_policy.test(allow_boolean_root_element)
+                && advance_false(p, last)) {
+//             *val = null_value{};
+            break;
+        }
 
         number_context<ForwardIterator> num;
 
         if (parse_policy.test(allow_number_root_element)
-                && advance_number(p, last, parse_policy, & num)) {
-
-            if (val) {
-                *val = to_number(num);
-            }
+                && advance_number(p, last, parse_policy, num)) {
 
             break;
         }
@@ -874,10 +935,12 @@ bool advance_json (ForwardIterator & pos, ForwardIterator last
 //                 && advance_string(p, last, val))
 //             break;
 //
-//         if (parse_policy.test(allow_boolean_root_element)
-//                 && advance_boolean(p, last, val))
-//             break;
+        // Not JSON sequence
+        return false;
     } while (false);
+
+    // Skip tail witespaces
+    advance_whitespaces(p, last);
 
     return compare_and_assign(pos, p);
 }

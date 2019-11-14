@@ -22,9 +22,10 @@ enum class errc
       success = 0
 
 // Parser errors
-    , unquoted_string
+    , unbalanced_quote
     , bad_escaped_char
     , bad_encoded_char
+    , unbalanced_array_bracket
 };
 
 class error_category : public std::error_category
@@ -40,7 +41,7 @@ public:
         switch (ev) {
             case static_cast<int>(errc::success):
                 return std::string{"no error"};
-            case static_cast<int>(errc::unquoted_string):
+            case static_cast<int>(errc::unbalanced_quote):
                 return std::string{"unquoted string"};
             case static_cast<int>(errc::bad_escaped_char):
                 return std::string{"bad escaped char"};
@@ -78,6 +79,9 @@ enum class value_type
     , array
 };
 
-class value {};
+class value
+{
+    value_type _type;
+};
 
 }} // // namespace pfs::json
