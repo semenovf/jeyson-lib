@@ -812,6 +812,78 @@ bool advance_value (ForwardIterator & pos, ForwardIterator last
         , error_code & ec);
 
 ////////////////////////////////////////////////////////////////////////////////
+// advance_value_separator
+////////////////////////////////////////////////////////////////////////////////
+/**
+ *  begin-array     = ws %x5B ws  ; [ left square bracket
+ *  begin-object    = ws %x7B ws  ; { left curly bracket
+ *  end-array       = ws %x5D ws  ; ] right square bracket
+ *  end-object      = ws %x7D ws  ; } right curly bracket
+ *  name-separator  = ws %x3A ws  ; : colon
+ *  value-separator = ws %x2C ws  ; , comma
+ */
+template <typename ForwardIterator>
+bool advance_delimiter_char (ForwardIterator & pos, ForwardIterator last
+        , typename std::remove_reference<decltype(*pos)>::type delim)
+{
+    ForwardIterator p = pos;
+    
+    advance_whitespaces(p, last);
+    
+    if (p == last)
+        return false;
+    
+    if (*p != delim)
+        return false;
+    
+    advance_whitespaces(p, last);
+    
+    return compare_and_assign(pos, p);
+}
+
+template <typename ForwardIterator>
+inline bool advance_begin_array (ForwardIterator & pos, ForwardIterator last)
+{
+    using char_type = typename std::remove_reference<decltype(*pos)>::type;
+    return advance_delimiter_char(pos, last, char_type{'['});
+}
+
+template <typename ForwardIterator>
+inline bool advance_begin_object (ForwardIterator & pos, ForwardIterator last)
+{
+    using char_type = typename std::remove_reference<decltype(*pos)>::type;
+    return advance_delimiter_char(pos, last, char_type{'{'});
+}
+
+template <typename ForwardIterator>
+inline bool advance_end_array (ForwardIterator & pos, ForwardIterator last)
+{
+    using char_type = typename std::remove_reference<decltype(*pos)>::type;
+    return advance_delimiter_char(pos, last, char_type{']'});
+}
+
+template <typename ForwardIterator>
+inline bool advance_end_object (ForwardIterator & pos, ForwardIterator last)
+{
+    using char_type = typename std::remove_reference<decltype(*pos)>::type;
+    return advance_delimiter_char(pos, last, char_type{'}'});
+}
+
+template <typename ForwardIterator>
+inline bool advance_name_separator (ForwardIterator & pos, ForwardIterator last)
+{
+    using char_type = typename std::remove_reference<decltype(*pos)>::type;
+    return advance_delimiter_char(pos, last, char_type{':'});
+}
+
+template <typename ForwardIterator>
+inline bool advance_value_separator (ForwardIterator & pos, ForwardIterator last)
+{
+    using char_type = typename std::remove_reference<decltype(*pos)>::type;
+    return advance_delimiter_char(pos, last, char_type{','});
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // advance_array
 ////////////////////////////////////////////////////////////////////////////////
 /**
@@ -830,44 +902,94 @@ bool advance_array (ForwardIterator & pos, ForwardIterator last
 {
     ForwardIterator p = pos;
 
-    // Skip head witespaces
-    advance_whitespaces(p, last);
-
-    if (p == last)
+    if (!advance_begin_array(p, last))
         return false;
 
-    if (*p != '[')
-        return false;
-
-    ++p;
-
-    // Skip witespaces
-    advance_whitespaces(p, last);
-
-    if (p == last) {
+    do {
+        if (!advance_value(p, last, parse_policy, ec)) {
+            // Error while parsing value
+            if (ec)
+                return false;
+            
+            break;
+        }
+    } while(advance_value_separator(p, last));
+    
+    if (!advance_end_array(p, last)) {
         ec = make_error_code(errc::unbalanced_array_bracket);
         return false;
     }
 
+    return compare_and_assign(pos, p);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// advance_member
+////////////////////////////////////////////////////////////////////////////////
+/**
+ * @note Grammar:
+ * member = string name-separator value
+ * name-separator  = ws %x3A ws  ; : colon
+ * value = false / null / true / object / array / number / string
+ */
+template <typename ForwardIterator, typename OutputIterator>
+bool advance_member (ForwardIterator & pos, ForwardIterator last
+        , parse_policy_set const & parse_policy
+        , string_context<ForwardIterator, OutputIterator> & string_ctx
+        , error_code & ec)
+{
+    ForwardIterator p = pos;
+    
+    if (!advance_string(p, last, parse_policy, string_ctx, ec))
+        return false;
+    
+    if (!advance_name_separator(p, last))
+        return false;
+    
     if (!advance_value(p, last, parse_policy, ec))
         return false;
+    
+    return compare_and_assign(pos, p);
+}
 
-    // Skip witespaces
-    advance_whitespaces(p, last);
+////////////////////////////////////////////////////////////////////////////////
+// advance_object
+////////////////////////////////////////////////////////////////////////////////
+/**
+ * @note Grammar:
+ * object = begin-object [ member *( value-separator member ) ] end-object
+ * member = string name-separator value
+ * begin-object    = ws %x7B ws  ; { left curly bracket
+ * end-object      = ws %x7D ws  ; } right curly bracket
+ * name-separator  = ws %x3A ws  ; : colon
+ * value-separator = ws %x2C ws  ; , comma
+ * value = false / null / true / object / array / number / string
+ */
+template <typename ForwardIterator>
+bool advance_object (ForwardIterator & pos, ForwardIterator last
+        , parse_policy_set const & parse_policy
+        , error_code & ec)
+{
+    ForwardIterator p = pos;
+ 
+    if (!advance_begin_object(p, last))
+        return false;
 
-    if (p == last) {
+    do {
+        if (!advance_memeber(p, last, parse_policy, ec)) {
+            // Error while parsing value
+            if (ec)
+                return false;
+            
+            break;
+        }
+    } while(advance_value_separator(p, last));
+    
+    if (!advance_end_object(p, last)) {
         ec = make_error_code(errc::unbalanced_array_bracket);
         return false;
     }
-
-    if (*p != ']') {
-        ec = make_error_code(errc::unbalanced_array_bracket);
-        return false;
-    }
-
-    // Skip tail witespaces
-    advance_whitespaces(p, last);
-
+ 
     return compare_and_assign(pos, p);
 }
 
@@ -959,6 +1081,5 @@ ForwardIterator parse (ForwardIterator first
 
     return first;
 }
-
 
 }} // // namespace pfs::json
