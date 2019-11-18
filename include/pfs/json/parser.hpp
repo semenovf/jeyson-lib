@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <bitset>
 #include <functional>
+#include <memory>
 #include <type_traits>
 #include <utility>
 
@@ -229,29 +230,6 @@ inline parse_policy_set relaxed_policy ()
     result.set(allow_any_char_escaped, true);
     return result;
 }
-
-////////////////////////////////////////////////////////////////////////////////
-// String context
-////////////////////////////////////////////////////////////////////////////////
-template <typename ForwardIterator, typename OutputIterator>
-struct string_context
-{
-    range<ForwardIterator> original; // Represents original sequence excluding quotation marks
-    OutputIterator output;           // Output iterator for parsed string
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// Number context
-////////////////////////////////////////////////////////////////////////////////
-template <typename ForwardIterator>
-struct number_context
-{
-    int sign = 1;
-    int exp_sign = 1;
-    range<ForwardIterator> integral_part;
-    range<ForwardIterator> fract_part;
-    range<ForwardIterator> exp_part;
-};
 
 ////////////////////////////////////////////////////////////////////////////////
 // compare_and_assign
@@ -550,7 +528,7 @@ bool advance_encoded_char (ForwardIterator & pos, ForwardIterator last
 template <typename ForwardIterator, typename OutputIterator>
 inline bool advance_string (ForwardIterator & pos, ForwardIterator last
         , parse_policy_set const & parse_policy
-        , string_context<ForwardIterator, OutputIterator> & string_ctx
+        , OutputIterator string_output
         , error_code & ec)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
@@ -574,14 +552,10 @@ inline bool advance_string (ForwardIterator & pos, ForwardIterator last
 
     // Check empty string
     if (*p == quotation_mark) {
-        string_ctx.original.first = p;
-        string_ctx.original.second = p;
-
         ++p;
         return compare_and_assign(pos, p);
     }
 
-    ForwardIterator begin_string_pos = p;
     bool escaped = false;
     bool encoded = false;
 
@@ -600,7 +574,7 @@ inline bool advance_string (ForwardIterator & pos, ForwardIterator last
                 return false;
             }
 
-            *string_ctx.output++ = char_type(encoded_char);
+            *string_output++ = char_type(encoded_char);
 
             encoded = false;
             continue;
@@ -610,7 +584,7 @@ inline bool advance_string (ForwardIterator & pos, ForwardIterator last
             if (*p == '\\') { // escape character
                 escaped = true;
             } else {
-                *string_ctx.output++ = *p;
+                *string_output++ = *p;
             }
         } else {
             auto escaped_char = *p;
@@ -643,7 +617,7 @@ inline bool advance_string (ForwardIterator & pos, ForwardIterator last
             }
 
             if (!encoded) {
-                *string_ctx.output++ = escaped_char;
+                *string_output++ = escaped_char;
             }
 
             // Finished process escaped sequence
@@ -652,9 +626,6 @@ inline bool advance_string (ForwardIterator & pos, ForwardIterator last
 
         ++p;
     }
-
-    string_ctx.original.first = begin_string_pos;
-    string_ctx.original.second = p;
 
     return compare_and_assign(pos, p);
 }
@@ -681,11 +652,16 @@ inline bool advance_string (ForwardIterator & pos, ForwardIterator last
  * plus = %x2B                ; +
  * zero = %x30                ; 0
  *
+ * @a NumberRep traits
+ * 
+ * NumberRep::operator = (double);
+ * NumberRep::operator = (intmax_t);
+ * NumberRep::operator = (uintmax_t);
  */
-template <typename ForwardIterator>
+template <typename ForwardIterator, typename NumberRep>
 bool advance_number (ForwardIterator & pos, ForwardIterator last
         , parse_policy_set const & parse_policy
-        , number_context<ForwardIterator> & num_ctx)
+        , NumberRep & num)
 {
     ForwardIterator p = pos;
     int sign = 1;
@@ -727,9 +703,9 @@ bool advance_number (ForwardIterator & pos, ForwardIterator last
     if (p == last_pos)
         return false;
 
-    num_ctx.integral_part.first = last_pos;
-    num_ctx.integral_part.second = p;
-    num_ctx.sign = sign;
+    range<ForwardIterator> integral_part;
+    integral_part.first = last_pos;
+    integral_part.second = p;
 
     last_pos = p;
 
@@ -757,8 +733,9 @@ bool advance_number (ForwardIterator & pos, ForwardIterator last
         }
     }
 
-    num_ctx.fract_part.first = last_pos;
-    num_ctx.fract_part.second = p;
+    range<ForwardIterator> fract_part;
+    fract_part.first = last_pos;
+    fract_part.second = p;
 
     last_pos = p;
 
@@ -796,9 +773,23 @@ bool advance_number (ForwardIterator & pos, ForwardIterator last
         }
     }
 
-    num_ctx.exp_part.first = last_pos;
-    num_ctx.exp_part.second = p;
-    num_ctx.exp_sign = exp_sign;
+    range<ForwardIterator> exp_part;
+    exp_part.first = last_pos;
+    exp_part.second = p;
+    bool integer_accepted = false;
+    
+    // Only integral part represented
+    if (fract_part.first == fract_part.second 
+            && exp_part.first == exp_part.second) {
+     
+        //intmax_t
+        
+        // If integer value is valid and there is no overflow/underflow
+        integer_accepted = true;
+    }
+    
+    if (!integer_accepted) {
+    }
 
     return compare_and_assign(pos, p);
 }
@@ -935,12 +926,13 @@ bool advance_array (ForwardIterator & pos, ForwardIterator last
 template <typename ForwardIterator, typename OutputIterator>
 bool advance_member (ForwardIterator & pos, ForwardIterator last
         , parse_policy_set const & parse_policy
-        , string_context<ForwardIterator, OutputIterator> & string_ctx
         , error_code & ec)
 {
+    OutputIterator string_output;
+    
     ForwardIterator p = pos;
     
-    if (!advance_string(p, last, parse_policy, string_ctx, ec))
+    if (!advance_string(p, last, parse_policy, string_output, ec))
         return false;
     
     if (!advance_name_separator(p, last))

@@ -236,9 +236,9 @@ TEST_CASE("advance_string") {
         auto last = data[i].s.end();
         pfs::json::error_code ec;
 
-        pfs::json::string_context<std::string::iterator, std::string::iterator> ctx;
+        std::string::iterator output;
 
-        CHECK(advance_string(pos, last, data[i].parse_policy, ctx, ec) == data[i].r);
+        CHECK(advance_string(pos, last, data[i].parse_policy, output, ec) == data[i].r);
         CHECK(ec == data[i].ec);
     }
 }
