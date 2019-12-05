@@ -11,17 +11,36 @@
 #include <algorithm>
 #include <bitset>
 #include <functional>
+#include <iterator>
 #include <memory>
+#include <string>
 #include <type_traits>
 #include <utility>
+#include <cassert>
+#include <clocale>
+#include <cstdlib>
 
 namespace pfs {
 namespace json {
 
-/* In short the main difference between RFC 7159 and RFC 4627 in one rule:
+/**
+ * [RFC 8259](https://tools.ietf.org/html/rfc8259)
+ * [RFC 7159](https://tools.ietf.org/html/rfc7159)
+ * [RFC 7158](https://tools.ietf.org/html/rfc7158)
+ * [RFC 4627](https://tools.ietf.org/html/rfc4627)
+ * [JSON5](https://spec.json5.org)
+ *
+ * History:
+ *
+ * RFC 8259 obsoletes RFC 7159
+ * RFC 7159 obsoletes RFC 7158 and RFC 4627
+ * RFC 7158 obsoletes RFC 4627
+ */
+
+/* In short the main difference between RFC 8259(7159) and RFC 4627 in one rule:
  *
  * RFC 4627: JSON-text = object / array
- * RFC 7159: JSON-text = ws value ws
+ * RFC 8259: JSON-text = ws value ws
  *
  */
 
@@ -36,10 +55,13 @@ namespace json {
  *  A JSON text is a serialized object or array.
  *
  *  RFC 4627: JSON-text = object / array
- *  RFC 7159: JSON-text = ws value ws
+ *
+ *  RFC 7159:
+ *  RFC 8259: JSON-text = ws value ws
  *
  *  RFC 4627:
  *  RFC 7159:
+ *  RFC 8259:
  *  ----------------------------------------------------------------------------
  *  ws = *(
  *      %x20 /              ; Space
@@ -51,6 +73,7 @@ namespace json {
  *
  *  RFC 4627:
  *  RFC 7159:
+ *  RFC 8259:
  *  ----------------------------------------------------------------------------
  *  begin-array     = ws %x5B ws  ; [ left square bracket
  *  begin-object    = ws %x7B ws  ; { left curly bracket
@@ -67,6 +90,7 @@ namespace json {
  *
  *  RFC 4627:
  *  RFC 7159:
+ *  RFC 8259:
  *  ----------------------------------------------------------------------------
  *  false null true
  *  ----------------------------------------------------------------------------
@@ -76,6 +100,7 @@ namespace json {
  *
  *  RFC 4627:
  *  RFC 7159:
+ *  RFC 8259:
  *  ----------------------------------------------------------------------------
  *  value = false / null / true / object / array / number / string
  *  false = %x66.61.6c.73.65   ; false
@@ -87,6 +112,7 @@ namespace json {
  *  ============================================================================
  *  RFC 4627:
  *  RFC 7159:
+ *  RFC 8259:
  *  ----------------------------------------------------------------------------
  *  object = begin-object [ member *( value-separator member ) ] end-object
  *
@@ -97,6 +123,7 @@ namespace json {
  *  ============================================================================
  *  RFC 4627:
  *  RFC 7159:
+ *  RFC 8259:
  *  ----------------------------------------------------------------------------
  *  array = begin-array [ value *( value-separator value ) ] end-array
  *  ----------------------------------------------------------------------------
@@ -105,6 +132,7 @@ namespace json {
  *  ============================================================================
  *  RFC 4627:
  *  RFC 7159:
+ *  RFC 8259:
  *  ----------------------------------------------------------------------------
  *  number = [ minus ] int [ frac ] [ exp ]
  *  decimal-point = %x2E       ; .
@@ -122,6 +150,7 @@ namespace json {
  *  ============================================================================
  *  RFC 4627:
  *  RFC 7159:
+ *  RFC 8259:
  *  ----------------------------------------------------------------------------
  *  string = quotation-mark *char quotation-mark
  *
@@ -141,6 +170,18 @@ namespace json {
  *  quotation-mark = %x22      ; "
  *  unescaped = %x20-21 / %x23-5B / %x5D-10FFFF
  *  ----------------------------------------------------------------------------
+ *
+ *  RFC 8259:
+ *  ----------------------------------------------------------------------------
+ *  A JSON parser transforms a JSON text into another representation.  A
+ *  JSON parser MUST accept all texts that conform to the JSON grammar.
+ *  A JSON parser MAY accept non-JSON forms or extensions.
+ *  An implementation may set limits on the size of texts that it
+ *  accepts.  An implementation may set limits on the maximum depth of
+ *  nesting.  An implementation may set limits on the range and precision
+ *  of numbers.  An implementation may set limits on the length and
+ *  character contents of strings.
+ *
  */
 
 template <typename T>
@@ -175,6 +216,51 @@ enum parse_policy_flag {
 };
 
 using parse_policy_set = std::bitset<parse_policy_count>;
+
+template <typename ForwardIterator>
+struct line_counter_iterator
+{
+    size_t _lineno = 0;
+    ForwardIterator _it;
+    bool _is_CR = false;
+
+public:
+    line_counter_iterator (ForwardIterator initial)
+        : _it(initial)
+    {}
+
+    line_counter_iterator (line_counter_iterator const & rhs)
+        : _lineno(rhs._lineno)
+        , _it(rhs._it)
+    {}
+
+    line_counter_iterator & operator ++ ()
+    {
+        if (*_it == '\x0D')
+            _is_CR == true;
+        else
+            _is_CR = false;
+
+        ++_it;
+
+        if (*_it == '\x0D' || (*_it == '\x0A' && !_is_CR))
+            ++_lineno;
+
+        return *this;
+    }
+
+    line_counter_iterator operator ++ (int)
+    {
+        line_counter_iterator it(*this);
+        ++(*this);
+        return it;
+    }
+
+    size_t lineno () const
+    {
+        return _lineno;
+    }
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Policy satisfying RFC 4627
@@ -229,6 +315,65 @@ inline parse_policy_set relaxed_policy ()
     result.set(allow_positive_signed_number, true);
     result.set(allow_any_char_escaped, true);
     return result;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// locale_decimal_point
+////////////////////////////////////////////////////////////////////////////////
+/**
+ * Get locale-specific decimal point character.
+ */
+inline char locale_decimal_point ()
+{
+    std::lconv const * loc = std::localeconv();
+    assert(loc);
+    return (loc->decimal_point && *loc->decimal_point != '\x0')
+            ? *loc->decimal_point : '.';
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Convert string to number functions
+////////////////////////////////////////////////////////////////////////////////
+inline bool strtointeger (long int & n, std::string const & numstr)
+{
+    char * endptr = nullptr;
+    n = std::strtol(numstr.c_str(), & endptr, 10);
+    return (errno != ERANGE && endptr == & *numstr.end());
+}
+
+inline bool strtointeger (long long int & n, std::string const & numstr)
+{
+    char * endptr = nullptr;
+    n = std::strtoll(numstr.c_str(), & endptr, 10);
+    return (errno != ERANGE && endptr == & *numstr.end());
+}
+
+inline bool strtouinteger (unsigned long int & n, std::string const & numstr)
+{
+    char * endptr = nullptr;
+    n = std::strtoul(numstr.c_str(), & endptr, 10);
+    return (errno != ERANGE && endptr == & *numstr.end());
+}
+
+inline bool strtouinteger (unsigned long long int & n, std::string const & numstr)
+{
+    char * endptr = nullptr;
+    n = std::strtoull(numstr.c_str(), & endptr, 10);
+    return (errno != ERANGE && endptr == & *numstr.end());
+}
+
+inline bool strtoreal (float & n, std::string const & numstr)
+{
+    char * endptr = nullptr;
+    n = std::strtof(numstr.c_str(), & endptr);
+    return (errno != ERANGE && endptr == & *numstr.end());
+}
+
+inline bool strtoreal (double & n, std::string const & numstr)
+{
+    char * endptr = nullptr;
+    n = std::strtod(numstr.c_str(), & endptr);
+    return (errno != ERANGE && endptr == & *numstr.end());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -371,7 +516,8 @@ inline bool is_quotation_mark (CharT ch, parse_policy_set const & parse_policy)
  * @return @c true if advanced by at least one position, otherwise @c false.
  */
 template <typename ForwardIterator>
-bool advance_whitespaces (ForwardIterator & pos, ForwardIterator last)
+bool advance_whitespaces (ForwardIterator & pos
+        , ForwardIterator last)
 {
     ForwardIterator p = pos;
 
@@ -525,10 +671,10 @@ bool advance_encoded_char (ForwardIterator & pos, ForwardIterator last
  *      / %x27                 ; '  JSON5 specific
  *  unescaped = %x20-21 / %x23-5B / %x5D-10FFFF
  */
-template <typename ForwardIterator, typename OutputIterator>
+template <typename ForwardIterator, typename StringType>
 inline bool advance_string (ForwardIterator & pos, ForwardIterator last
         , parse_policy_set const & parse_policy
-        , OutputIterator string_output
+        , StringType & result
         , error_code & ec)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
@@ -559,13 +705,9 @@ inline bool advance_string (ForwardIterator & pos, ForwardIterator last
     bool escaped = false;
     bool encoded = false;
 
-    while (*p != quotation_mark) {
-        // ERROR: unquoted string
-        if (p == last) {
-            ec = make_error_code(errc::unbalanced_quote);
-            return false;
-        }
+    auto output = std::back_inserter(result);
 
+    while (p != last && *p != quotation_mark) {
         if (encoded) {
             int32_t encoded_char = 0;
 
@@ -574,7 +716,7 @@ inline bool advance_string (ForwardIterator & pos, ForwardIterator last
                 return false;
             }
 
-            *string_output++ = char_type(encoded_char);
+            *output++ = char_type(encoded_char);
 
             encoded = false;
             continue;
@@ -584,7 +726,7 @@ inline bool advance_string (ForwardIterator & pos, ForwardIterator last
             if (*p == '\\') { // escape character
                 escaped = true;
             } else {
-                *string_output++ = *p;
+                *output++ = *p;
             }
         } else {
             auto escaped_char = *p;
@@ -617,7 +759,7 @@ inline bool advance_string (ForwardIterator & pos, ForwardIterator last
             }
 
             if (!encoded) {
-                *string_output++ = escaped_char;
+                *output++ = escaped_char;
             }
 
             // Finished process escaped sequence
@@ -626,6 +768,15 @@ inline bool advance_string (ForwardIterator & pos, ForwardIterator last
 
         ++p;
     }
+
+    // ERROR: unquoted string
+    if (p == last || *p != quotation_mark) {
+        ec = make_error_code(errc::unbalanced_quote);
+        return false;
+    }
+
+    // Skip quotation mark
+    ++p;
 
     return compare_and_assign(pos, p);
 }
@@ -653,27 +804,32 @@ inline bool advance_string (ForwardIterator & pos, ForwardIterator last
  * zero = %x30                ; 0
  *
  * @a NumberRep traits
- * 
+ *
  * NumberRep::operator = (double);
  * NumberRep::operator = (intmax_t);
  * NumberRep::operator = (uintmax_t);
  */
-template <typename ForwardIterator, typename NumberRep>
+template <typename ForwardIterator, typename NumberType>
 bool advance_number (ForwardIterator & pos, ForwardIterator last
         , parse_policy_set const & parse_policy
-        , NumberRep & num)
+        , NumberType & num
+        , error_code & /*ec*/)
 {
     ForwardIterator p = pos;
+    std::string numstr;
     int sign = 1;
-    int exp_sign = 1;
+    bool is_integer = true;
 
+    ////////////////////////////////////////////////////////////////////////////
+    // Advance sign
+    ////////////////////////////////////////////////////////////////////////////
     if (p != last) {
         if (*p == '-') {
             sign = -1;
+            numstr.push_back('-');
             ++p;
         } else if (*p == '+') {
             if (parse_policy.test(allow_positive_signed_number)) {
-                sign = 1;
                 ++p;
             } else {
                 return false;
@@ -684,16 +840,18 @@ bool advance_number (ForwardIterator & pos, ForwardIterator last
     ForwardIterator last_pos = p;
 
     ////////////////////////////////////////////////////////////////////////////
-    // Integral part
+    // Advance integral part
     //
     // Mandatory
     // int = zero / ( digit1-9 *DIGIT )
     ////////////////////////////////////////////////////////////////////////////
     if (p != last) {
         if (*p == '0') {
+            numstr.push_back('0');
             ++p;
         } else {
             while (p != last && is_digit(*p)) {
+                numstr.push_back(*p);
                 ++p;
             }
         }
@@ -702,10 +860,6 @@ bool advance_number (ForwardIterator & pos, ForwardIterator last
     // No digit found
     if (p == last_pos)
         return false;
-
-    range<ForwardIterator> integral_part;
-    integral_part.first = last_pos;
-    integral_part.second = p;
 
     last_pos = p;
 
@@ -717,6 +871,9 @@ bool advance_number (ForwardIterator & pos, ForwardIterator last
     ////////////////////////////////////////////////////////////////////////////
     if (p != last) {
         if (*p == '.') {
+            is_integer = false;
+            numstr.push_back(locale_decimal_point());
+
             ++p;
 
             if (p == last)
@@ -725,17 +882,15 @@ bool advance_number (ForwardIterator & pos, ForwardIterator last
             if (!is_digit(*p))
                 return false;
 
+            numstr.push_back(*p);
             ++p;
 
             while (p != last && is_digit(*p)) {
+                numstr.push_back(*p);
                 ++p;
             }
         }
     }
-
-    range<ForwardIterator> fract_part;
-    fract_part.first = last_pos;
-    fract_part.second = p;
 
     last_pos = p;
 
@@ -747,14 +902,15 @@ bool advance_number (ForwardIterator & pos, ForwardIterator last
     ////////////////////////////////////////////////////////////////////////////
     if (p != last) {
         if (*p == 'e' || *p == 'E') {
+            is_integer = false;
+            numstr.push_back('e');
             ++p;
 
             if (p != last) {
                 if (*p == '-') {
-                    exp_sign = -1;
+                    numstr.push_back('-');
                     ++p;
                 } else if (*p == '+') {
-                    exp_sign = 1;
                     ++p;
                 }
             }
@@ -765,30 +921,43 @@ bool advance_number (ForwardIterator & pos, ForwardIterator last
             if (!is_digit(*p))
                 return false;
 
+            numstr.push_back(*p);
             ++p;
 
             while (p != last && is_digit(*p)) {
+                numstr.push_back(*p);
                 ++p;
             }
         }
     }
 
-    range<ForwardIterator> exp_part;
-    exp_part.first = last_pos;
-    exp_part.second = p;
     bool integer_accepted = false;
-    
-    // Only integral part represented
-    if (fract_part.first == fract_part.second 
-            && exp_part.first == exp_part.second) {
-     
-        //intmax_t
-        
-        // If integer value is valid and there is no overflow/underflow
-        integer_accepted = true;
+
+    if (is_integer) {
+        if (sign > 0) {
+            uintmax_t n = 0;
+
+            if (strtouinteger(n, numstr)) {
+                num = n;
+                integer_accepted = true;
+            }
+        } else {
+            intmax_t n = 0;
+
+            if (strtointeger(n, numstr)) {
+                num = n;
+                integer_accepted = true;
+            }
+        }
     }
-    
+
     if (!integer_accepted) {
+        double n = 0;
+        if (!strtoreal(n, numstr)) {
+            return false;
+        }
+
+        num = n;
     }
 
     return compare_and_assign(pos, p);
@@ -797,9 +966,26 @@ bool advance_number (ForwardIterator & pos, ForwardIterator last
 ////////////////////////////////////////////////////////////////////////////////
 // Forward declaration for advance_value
 ////////////////////////////////////////////////////////////////////////////////
-template <typename ForwardIterator>
-bool advance_value (ForwardIterator & pos, ForwardIterator last
+template <typename ForwardIterator, typename ValueType>
+typename std::enable_if<std::is_arithmetic<ValueType>::value, bool>::type
+advance_value (ForwardIterator & pos, ForwardIterator last
         , parse_policy_set const & parse_policy
+        , ValueType & value
+        , error_code & ec);
+
+// std::string
+template <typename ForwardIterator, typename ValueType>
+typename std::enable_if<std::is_same<ValueType, std::string>::value, bool>::type
+advance_value (ForwardIterator & pos, ForwardIterator last
+        , parse_policy_set const & parse_policy
+        , ValueType & value
+        , error_code & ec);
+
+template <typename ForwardIterator, typename ValueType>
+typename std::enable_if<!std::is_same<ValueType, std::string>::value && !std::is_arithmetic<ValueType>::value, bool>::type
+advance_value (ForwardIterator & pos, ForwardIterator last
+        , parse_policy_set const & parse_policy
+        , ValueType & value
         , error_code & ec);
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -818,17 +1004,18 @@ bool advance_delimiter_char (ForwardIterator & pos, ForwardIterator last
         , typename std::remove_reference<decltype(*pos)>::type delim)
 {
     ForwardIterator p = pos;
-    
+
     advance_whitespaces(p, last);
-    
+
     if (p == last)
         return false;
-    
+
     if (*p != delim)
         return false;
-    
+
+    ++p;
     advance_whitespaces(p, last);
-    
+
     return compare_and_assign(pos, p);
 }
 
@@ -886,9 +1073,10 @@ inline bool advance_value_separator (ForwardIterator & pos, ForwardIterator last
  * value-separator = ws %x2C ws  ; , comma
  * value = false / null / true / object / array / number / string
  */
-template <typename ForwardIterator>
+template <typename ForwardIterator, typename ArrayType>
 bool advance_array (ForwardIterator & pos, ForwardIterator last
         , parse_policy_set const & parse_policy
+        , ArrayType & array
         , error_code & ec)
 {
     ForwardIterator p = pos;
@@ -897,15 +1085,19 @@ bool advance_array (ForwardIterator & pos, ForwardIterator last
         return false;
 
     do {
-        if (!advance_value(p, last, parse_policy, ec)) {
+        typename ArrayType::value_type item;
+
+        if (!advance_value(p, last, parse_policy, item, ec)) {
             // Error while parsing value
             if (ec)
                 return false;
-            
+
             break;
         }
+
+        array.emplace_back(std::move(item));
     } while(advance_value_separator(p, last));
-    
+
     if (!advance_end_array(p, last)) {
         ec = make_error_code(errc::unbalanced_array_bracket);
         return false;
@@ -923,24 +1115,26 @@ bool advance_array (ForwardIterator & pos, ForwardIterator last
  * name-separator  = ws %x3A ws  ; : colon
  * value = false / null / true / object / array / number / string
  */
-template <typename ForwardIterator, typename OutputIterator>
+template <typename ForwardIterator, typename ValueType>
 bool advance_member (ForwardIterator & pos, ForwardIterator last
         , parse_policy_set const & parse_policy
         , error_code & ec)
 {
-    OutputIterator string_output;
-    
     ForwardIterator p = pos;
-    
-    if (!advance_string(p, last, parse_policy, string_output, ec))
+
+    typename ValueType::string_type name;
+
+    if (!advance_string(p, last, parse_policy, name, ec))
         return false;
-    
+
     if (!advance_name_separator(p, last))
         return false;
-    
-    if (!advance_value(p, last, parse_policy, ec))
+
+    ValueType value;
+
+    if (!advance_value(p, last, parse_policy, value, ec))
         return false;
-    
+
     return compare_and_assign(pos, p);
 }
 
@@ -948,6 +1142,11 @@ bool advance_member (ForwardIterator & pos, ForwardIterator last
 // advance_object
 ////////////////////////////////////////////////////////////////////////////////
 /**
+ * @details ObjectType traits:
+ *  - provides @code key_type @endcode typename
+ *  - provides @code mapped_type @endcode typename
+ *  - provides @code emplace(std::pair<key_type, mapped_type> &&) @endcode method
+ *
  * @note Grammar:
  * object = begin-object [ member *( value-separator member ) ] end-object
  * member = string name-separator value
@@ -957,31 +1156,44 @@ bool advance_member (ForwardIterator & pos, ForwardIterator last
  * value-separator = ws %x2C ws  ; , comma
  * value = false / null / true / object / array / number / string
  */
-template <typename ForwardIterator>
+template <typename ForwardIterator, typename ObjectType>
 bool advance_object (ForwardIterator & pos, ForwardIterator last
         , parse_policy_set const & parse_policy
+        , ObjectType & object
         , error_code & ec)
 {
     ForwardIterator p = pos;
- 
+
     if (!advance_begin_object(p, last))
         return false;
 
     do {
-        if (!advance_memeber(p, last, parse_policy, ec)) {
+        typename ObjectType::key_type name;
+
+        if (!advance_string(p, last, parse_policy, name, ec)) {
             // Error while parsing value
             if (ec)
                 return false;
-            
+
             break;
         }
+
+        if (!advance_name_separator(p, last))
+            return false;
+
+        typename ObjectType::mapped_type value;
+
+        if (!advance_value(p, last, parse_policy, value, ec))
+            return false;
+
+        object.emplace(std::make_pair(std::move(name), std::move(value)));
     } while(advance_value_separator(p, last));
-    
+
     if (!advance_end_object(p, last)) {
         ec = make_error_code(errc::unbalanced_array_bracket);
         return false;
     }
- 
+
     return compare_and_assign(pos, p);
 }
 
@@ -994,10 +1206,14 @@ bool advance_object (ForwardIterator & pos, ForwardIterator last
 
 ////////////////////////////////////////////////////////////////////////////////
 // advance_value
+//
+// Specialization: yes, for values of arithmetic type
 ////////////////////////////////////////////////////////////////////////////////
-template <typename ForwardIterator>
-bool advance_value (ForwardIterator & pos, ForwardIterator last
+template <typename ForwardIterator, typename ValueType>
+typename std::enable_if<std::is_arithmetic<ValueType>::value, bool>::type
+advance_value (ForwardIterator & pos, ForwardIterator last
         , parse_policy_set const & parse_policy
+        , ValueType & value
         , error_code & ec)
 {
     ForwardIterator p = pos;
@@ -1006,49 +1222,125 @@ bool advance_value (ForwardIterator & pos, ForwardIterator last
     advance_whitespaces(p, last);
 
     do {
+        ValueType num;
+
+        if (advance_number(p, last, parse_policy, num, ec)) {
+            value = num;
+            break;
+        }
+
+        // Not an array of values of arithmetic type
+        return false;
+    } while (false);
+
+    // Skip tail witespaces
+    advance_whitespaces(p, last);
+
+    return compare_and_assign(pos, p);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// advance_value
+//
+// Specialization: yes, for values of std::string
+////////////////////////////////////////////////////////////////////////////////
+template <typename ForwardIterator, typename ValueType>
+typename std::enable_if<std::is_same<ValueType, std::string>::value, bool>::type
+advance_value (ForwardIterator & pos, ForwardIterator last
+        , parse_policy_set const & parse_policy
+        , ValueType & value
+        , error_code & ec)
+{
+    ForwardIterator p = pos;
+
+    // Skip head witespaces
+    advance_whitespaces(p, last);
+
+    do {
+        ValueType str;
+
+        if (advance_string(p, last, parse_policy, str, ec)) {
+            value = std::move(str);
+            break;
+        }
+
+        // Not an array of std::string values
+        return false;
+    } while (false);
+
+    // Skip tail witespaces
+    advance_whitespaces(p, last);
+
+    return compare_and_assign(pos, p);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// advance_value
+//
+// Specialization: no, for values of any type
+////////////////////////////////////////////////////////////////////////////////
+template <typename ForwardIterator, typename ValueType>
+typename std::enable_if<!std::is_same<ValueType, std::string>::value && !std::is_arithmetic<ValueType>::value, bool>::type
+advance_value (ForwardIterator & pos, ForwardIterator last
+        , parse_policy_set const & parse_policy
+        , ValueType & value
+        , error_code & ec)
+{
+    ForwardIterator p = pos;
+
+    // Skip head witespaces
+    advance_whitespaces(p, last);
+
+    do {
+        // Array marker
         if (*p == '[') {
-//         if (parse_policy.test(allow_array_root_element)
-//                 && advance_array(p, last, val))
-//             break;
+            typename ValueType::array_type array;
+
+            if (advance_array(p, last, parse_policy, array, ec)) {
+                value = std::move(array);
+                break;
+            }
         }
 
+        // Object marker
         if (*p == '{') {
-//         if (parse_policy.test(allow_object_root_element)
-//                 && advance_object(p, last, val))
-//             break;
-//
+            typename ValueType::object_type object;
+
+            if (advance_object(p, last, parse_policy, object, ec)) {
+                value = std::move(object);
+                break;
+            }
         }
 
-        if (parse_policy.test(allow_null_root_element)
-                && advance_null(p, last)) {
-//             *val = null_value{};
+        if (advance_null(p, last)) {
+            value = nullptr;
             break;
         }
 
-        if (parse_policy.test(allow_boolean_root_element)
-                && advance_true(p, last)) {
-//             *val = null_value{};
+        if (advance_true(p, last)) {
+            value = true;
             break;
         }
 
-        if (parse_policy.test(allow_boolean_root_element)
-                && advance_false(p, last)) {
-//             *val = null_value{};
+        if (advance_false(p, last)) {
+            value = false;
             break;
         }
 
-        number_context<ForwardIterator> num;
+        typename ValueType::number_type num;
 
-        if (parse_policy.test(allow_number_root_element)
-                && advance_number(p, last, parse_policy, num)) {
-
+        if (advance_number(p, last, parse_policy, num, ec)) {
+            value = num;
             break;
         }
 
-//         if (parse_policy.test(allow_string_root_element)
-//                 && advance_string(p, last, val))
-//             break;
-//
+        typename ValueType::string_type str;
+
+        if (advance_string(p, last, parse_policy, str, ec)) {
+            value = std::move(str);
+            break;
+        }
+
         // Not JSON sequence
         return false;
     } while (false);
@@ -1059,19 +1351,72 @@ bool advance_value (ForwardIterator & pos, ForwardIterator last
     return compare_and_assign(pos, p);
 }
 
-template <typename ForwardIterator>
-ForwardIterator parse (ForwardIterator first
+////////////////////////////////////////////////////////////////////////////////
+// advance_json
+////////////////////////////////////////////////////////////////////////////////
+template <typename ForwardIterator, typename JsonType>
+bool advance_json (ForwardIterator & pos, ForwardIterator last
+        , parse_policy_set const & parse_policy
+        , JsonType & value
+        , error_code & ec)
+{
+    ForwardIterator p = pos;
+
+    // Skip head witespaces
+    advance_whitespaces(p, last);
+
+    if ((*p == '[' && !parse_policy.test(allow_array_root_element))
+            || (*p == '{' && !parse_policy.test(allow_object_root_element))) {
+        ec = make_error_code(errc::forbidden_root_element);
+        return false;
+    }
+
+    if (!advance_value(p, last, parse_policy, value, ec))
+        return false;
+
+    if ((value.is_null() && !parse_policy.test(allow_array_root_element))
+            || (value.is_boolean() && !parse_policy.test(allow_boolean_root_element))
+            || (value.is_number() && !parse_policy.test(allow_number_root_element))
+            || (value.is_string() && !parse_policy.test(allow_string_root_element))
+            || (value.is_array() && !parse_policy.test(allow_array_root_element))
+            || (value.is_object() && !parse_policy.test(allow_object_root_element))) {
+        ec = make_error_code(errc::forbidden_root_element);
+        return false;
+    }
+
+    // Skip tail witespaces
+    advance_whitespaces(p, last);
+
+    return compare_and_assign(pos, p);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+////////////////////////////////////////////////////////////////////////////////
+template <typename ForwardIterator, typename ValueRep>
+inline ForwardIterator parse (ForwardIterator first
         , ForwardIterator last
-        , parse_policy_set const & parse_policy = strict_policy()
-        , value * val = nullptr)
+        , parse_policy_set const & parse_policy
+        , ValueRep & value)
 {
     ForwardIterator pos = first;
 
-    if (advance_json(pos, last, val, parse_policy)) {
+    if (advance_json(pos, last, parse_policy, value)) {
         return pos;
     }
 
     return first;
+}
+
+/**
+ *
+ */
+template <typename ForwardIterator, typename ValueRep>
+inline ForwardIterator parse (ForwardIterator first
+        , ForwardIterator last
+        , ValueRep & value)
+{
+    return parse(first, last, strict_policy(), value);
 }
 
 }} // // namespace pfs::json
