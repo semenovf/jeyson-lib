@@ -238,7 +238,11 @@ TEST_CASE("advance_string") {
 
         std::string s;
 
-        CHECK(advance_string(pos, last, data[i].parse_policy, s, ec) == data[i].r);
+        CHECK(advance_string(pos
+                , last
+                , data[i].parse_policy
+                , std::back_inserter(s)
+                , ec) == data[i].r);
         CHECK(ec == data[i].ec);
     }
 }
@@ -335,13 +339,12 @@ struct test_advance_number : test_advance_data
 TEST_CASE("advance_number for integers") {
     using integer_type = int;
     using pfs::json::advance_number;
-    using pfs::json::strict_policy;
     using pfs::json::relaxed_policy;
 
-    integer_type max_ingeter = std::numeric_limits<integer_type>::max();
-    integer_type min_ingeter = std::numeric_limits<integer_type>::min();
-    std::string max_ingeter_str = std::to_string(max_ingeter);
-    std::string min_ingeter_str = std::to_string(min_ingeter);
+    integer_type max_integer = std::numeric_limits<integer_type>::max();
+    integer_type min_integer = std::numeric_limits<integer_type>::min();
+    std::string max_integer_str = std::to_string(max_integer);
+    std::string min_integer_str = std::to_string(min_integer);
 
     test_advance_number<integer_type> data[] = {
           {    0, "0"   , true }
@@ -351,8 +354,8 @@ TEST_CASE("advance_number for integers") {
         , {    1, "1"   , true }
         , {  256, "256" , true }
         , { -256, "-256" , true }
-        , {  max_ingeter, max_ingeter_str, true }
-        , {  min_ingeter, min_ingeter_str, true }
+        , {  max_integer, max_integer_str, true }
+        , {  min_integer, min_integer_str, true }
     };
 
     for (int i = 0, count = sizeof(data) / sizeof(data[0])
@@ -362,7 +365,7 @@ TEST_CASE("advance_number for integers") {
         pfs::json::error_code ec;
 
         integer_type num;
-        auto ok = advance_number(pos, last, data[i].parse_policy, num, ec);
+        auto ok = advance_number(pos, last, data[i].parse_policy, & num, ec);
 
         CHECK(ok == data[i].r);
 
@@ -373,7 +376,6 @@ TEST_CASE("advance_number for integers") {
 
 TEST_CASE("advance_number for custom number type") {
     using pfs::json::advance_number;
-    using pfs::json::strict_policy;
     using pfs::json::relaxed_policy;
 
     test_advance_number<Number> data[] = {
@@ -391,7 +393,7 @@ TEST_CASE("advance_number for custom number type") {
         pfs::json::error_code ec;
 
         Number num;
-        auto ok = advance_number(pos, last, data[i].parse_policy, num, ec);
+        auto ok = advance_number(pos, last, data[i].parse_policy, & num, ec);
 
         CHECK(ok == data[i].r);
 
@@ -400,8 +402,29 @@ TEST_CASE("advance_number for custom number type") {
     }
 }
 
-TEST_CASE("advance_array of integers") {
-    using pfs::json::advance_array;
+TEST_CASE("parse_array of booleans") {
+    using pfs::json::parse_array;
+    using pfs::json::strict_policy;
+
+    auto arr_str = std::string{"[true, true, false, true, false]"};
+    std::vector<bool> arr;
+    pfs::json::error_code ec;
+
+    auto first = arr_str.begin();
+    auto last = arr_str.end();
+    auto pos = parse_array(first, last, strict_policy(), arr, ec);
+    REQUIRE(ec == pfs::json::error_code{});
+    REQUIRE(pos == last);
+    REQUIRE(arr.size() == 5);
+    CHECK(arr[0] == true);
+    CHECK(arr[1] == true);
+    CHECK(arr[2] == false);
+    CHECK(arr[3] == true);
+    CHECK(arr[4] == false);
+}
+
+TEST_CASE("parse_array of integers") {
+    using pfs::json::parse_array;
     using pfs::json::strict_policy;
 
     auto arr_str = std::string{"[1, 2, 3, 4, 5]"};
@@ -410,7 +433,9 @@ TEST_CASE("advance_array of integers") {
 
     auto first = arr_str.begin();
     auto last = arr_str.end();
-    REQUIRE(advance_array(first, last, strict_policy(), arr, ec) == true);
+    auto pos = parse_array(first, last, strict_policy(), arr, ec);
+    REQUIRE(ec == pfs::json::error_code{});
+    REQUIRE(pos == last);
     REQUIRE(arr.size() == 5);
     CHECK(arr[0] == 1);
     CHECK(arr[1] == 2);
@@ -419,8 +444,29 @@ TEST_CASE("advance_array of integers") {
     CHECK(arr[4] == 5);
 }
 
+TEST_CASE("parse_array of floating points") {
+    using pfs::json::parse_array;
+    using pfs::json::strict_policy;
+
+    auto arr_str = std::string{"[0.1, 0.2, 0.3, 0.4, 0.5]"};
+    std::vector<double> arr;
+    pfs::json::error_code ec;
+
+    auto first = arr_str.begin();
+    auto last = arr_str.end();
+    auto pos = parse_array(first, last, strict_policy(), arr, ec);
+    REQUIRE(ec == pfs::json::error_code{});
+    REQUIRE(pos == last);
+    REQUIRE(arr.size() == 5);
+    CHECK(arr[0] == std::stod("0.1"));
+    CHECK(arr[1] == std::stod("0.2"));
+    CHECK(arr[2] == std::stod("0.3"));
+    CHECK(arr[3] == std::stod("0.4"));
+    CHECK(arr[4] == std::stod("0.5"));
+}
+
 TEST_CASE("advance_array of strings") {
-    using pfs::json::advance_array;
+    using pfs::json::parse_array;
     using pfs::json::strict_policy;
 
     auto arr_str = std::string{"[\"one\", \"two\", \"three\"]"};
@@ -429,44 +475,45 @@ TEST_CASE("advance_array of strings") {
 
     auto first = arr_str.begin();
     auto last = arr_str.end();
-    REQUIRE(advance_array(first, last, strict_policy(), arr, ec) == true);
+    auto pos = parse_array(first, last, strict_policy(), arr, ec);
+    REQUIRE(ec == pfs::json::error_code{});
+    REQUIRE(pos == last);
     REQUIRE(arr.size() == 3);
     CHECK(arr[0] == "one");
     CHECK(arr[1] == "two");
     CHECK(arr[2] == "three");
 }
 
-///
-TEST_CASE("advance_object of integers") {
-    using pfs::json::advance_object;
-    using pfs::json::strict_policy;
-
-    auto obj_str = std::string{"{\"one\": 1, \"two\": 2, \"three\": 3}"};
-    std::map<std::string, int> obj;
-    pfs::json::error_code ec;
-
-    auto first = obj_str.begin();
-    auto last = obj_str.end();
-    REQUIRE(advance_object(first, last, strict_policy(), obj, ec) == true);
-    REQUIRE(obj.size() == 3);
-    CHECK(obj["one"] == 1);
-    CHECK(obj["two"] == 2);
-    CHECK(obj["three"] == 3);
-}
-
-TEST_CASE("advance_object of strings") {
-    using pfs::json::advance_object;
-    using pfs::json::strict_policy;
-
-    auto obj_str = std::string{"{\"one\": \"one\", \"two\": \"two\", \"three\": \"three\"}"};
-    std::map<std::string, std::string> obj;
-    pfs::json::error_code ec;
-
-    auto first = obj_str.begin();
-    auto last = obj_str.end();
-    REQUIRE(advance_object(first, last, strict_policy(), obj, ec) == true);
-    REQUIRE(obj.size() == 3);
-    CHECK(obj["one"] == "one");
-    CHECK(obj["two"] == "two");
-    CHECK(obj["three"] == "three");
-}
+// TEST_CASE("advance_object of integers") {
+//     using pfs::json::advance_object;
+//     using pfs::json::strict_policy;
+//
+//     auto obj_str = std::string{"{\"one\": 1, \"two\": 2, \"three\": 3}"};
+//     std::map<std::string, int> obj;
+//     pfs::json::error_code ec;
+//
+//     auto first = obj_str.begin();
+//     auto last = obj_str.end();
+//     REQUIRE(advance_object(first, last, strict_policy(), obj, ec) == true);
+//     REQUIRE(obj.size() == 3);
+//     CHECK(obj["one"] == 1);
+//     CHECK(obj["two"] == 2);
+//     CHECK(obj["three"] == 3);
+// }
+//
+// TEST_CASE("advance_object of strings") {
+//     using pfs::json::advance_object;
+//     using pfs::json::strict_policy;
+//
+//     auto obj_str = std::string{"{\"one\": \"one\", \"two\": \"two\", \"three\": \"three\"}"};
+//     std::map<std::string, std::string> obj;
+//     pfs::json::error_code ec;
+//
+//     auto first = obj_str.begin();
+//     auto last = obj_str.end();
+//     REQUIRE(advance_object(first, last, strict_policy(), obj, ec) == true);
+//     REQUIRE(obj.size() == 3);
+//     CHECK(obj["one"] == "one");
+//     CHECK(obj["two"] == "two");
+//     CHECK(obj["three"] == "three");
+// }

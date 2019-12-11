@@ -27,6 +27,9 @@ enum class errc
     , bad_escaped_char
     , bad_encoded_char
     , unbalanced_array_bracket
+    , unbalanced_object_bracket
+    , bad_member_name
+    , bad_json_sequence
 };
 
 class error_category : public std::error_category
@@ -50,6 +53,14 @@ public:
                 return std::string{"bad escaped char"};
             case static_cast<int>(errc::bad_encoded_char):
                 return std::string{"bad encoded char"};
+            case static_cast<int>(errc::unbalanced_array_bracket):
+                return std::string{"unbalanced array bracket"};
+            case static_cast<int>(errc::unbalanced_object_bracket):
+                return std::string{"unbalanced object bracket"};
+            case static_cast<int>(errc::bad_member_name):
+                return std::string{"bad member name"};
+            case static_cast<int>(errc::bad_json_sequence):
+                return std::string{"bad json sequence"};
 
             default: return std::string{"unknown JSON error"};
         }
