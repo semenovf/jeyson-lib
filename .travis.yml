@@ -11,7 +11,25 @@ matrix:
     env:
       - COMPILER=g++-5
       - CXX_STANDARD=11
+    addons:
+      apt:
+        sources: ['ubuntu-toolchain-r-test']
+        packages: ['g++-5', 'ninja-build']
+
+  - os: linux
+    compiler: gcc
+    env:
+      - COMPILER=g++-5
       - CXX_STANDARD=14
+    addons:
+      apt:
+        sources: ['ubuntu-toolchain-r-test']
+        packages: ['g++-5', 'ninja-build']
+
+  - os: linux
+    compiler: gcc
+    env:
+      - COMPILER=g++-5
       - CXX_STANDARD=17
     addons:
       apt:
