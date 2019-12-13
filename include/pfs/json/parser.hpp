@@ -232,6 +232,7 @@ struct basic_callbacks
     std::function<void()> on_false = [] {};
     std::function<void(number_type &&)> on_number = [] (number_type &&) {};
     std::function<void(string_type &&)> on_string = [] (string_type &&) {};
+    std::function<void(string_type &&)> on_member_name = [] (string_type &&) {};
     std::function<void()> on_begin_array = [] {};
     std::function<void()> on_end_array = [] {};
     std::function<void()> on_begin_object = [] {};
@@ -1165,7 +1166,7 @@ bool advance_member (ForwardIterator & pos, ForwardIterator last
     if (!advance_name_separator(p, last))
         return false;
 
-    callbacks.on_string(std::move(name));
+    callbacks.on_member_name(std::move(name));
 
     if (!advance_value(p, last, parse_policy, callbacks))
         return false;
@@ -1429,9 +1430,9 @@ inline ForwardIterator parse (ForwardIterator first
     return parse(first, last, default_policy(), callbacks);
 }
 
-/**
- *
- */
+////////////////////////////////////////////////////////////////////////////////
+// parse_array
+////////////////////////////////////////////////////////////////////////////////
 template <typename ForwardIterator, typename ArrayType>
 typename std::enable_if<std::is_arithmetic<typename ArrayType::value_type>::value, ForwardIterator>::type
 parse_array (ForwardIterator first
@@ -1441,8 +1442,8 @@ parse_array (ForwardIterator first
         , error_code & ec)
 {
     using value_type = typename ArrayType::value_type;
-    using string_type = std::string;
-    basic_callbacks<string_type, value_type> callbacks;
+    // No matter the string type here
+    basic_callbacks<std::string, value_type> callbacks;
     callbacks.on_error  = [& ec] (error_code const & e) { ec = e; };
     callbacks.on_true   = [& arr] { arr.emplace_back(static_cast<value_type>(true)); };
     callbacks.on_false  = [& arr] { arr.emplace_back(static_cast<value_type>(false)); };
@@ -1456,7 +1457,6 @@ struct is_string;
 template <>
 struct is_string<std::string> : std::integral_constant<bool, true> {};
 
-
 template <typename ForwardIterator, typename ArrayType>
 typename std::enable_if<is_string<typename ArrayType::value_type>::value, ForwardIterator>::type
 parse_array (ForwardIterator first
@@ -1465,10 +1465,12 @@ parse_array (ForwardIterator first
         , ArrayType & arr
         , error_code & ec)
 {
-    basic_callbacks<std::string, int> callbacks;
+    using string_type = typename ArrayType::value_type;
+    // No matter the number type here
+    basic_callbacks<string_type, int> callbacks;
     callbacks.on_error  = [& ec] (error_code const & e) { ec = e; };
-    callbacks.on_string = [& arr] (std::string && s) {
-        arr.emplace_back(std::forward<std::string>(s));
+    callbacks.on_string = [& arr] (string_type && s) {
+        arr.emplace_back(std::forward<string_type>(s));
     };
     return parse(first, last, parse_policy, callbacks);
 }
@@ -1489,6 +1491,76 @@ inline ForwardIterator parse_array (ForwardIterator first
 {
     error_code ec;
     auto pos = parse_array(first, last, arr, ec);
+    if (ec)
+        throw std::system_error(ec);
+    return pos;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// parse_object
+////////////////////////////////////////////////////////////////////////////////
+template <typename ForwardIterator, typename ObjectType>
+typename std::enable_if<is_string<typename ObjectType::key_type>::value
+        && std::is_arithmetic<typename ObjectType::mapped_type>::value, ForwardIterator>::type
+parse_object (ForwardIterator first
+        , ForwardIterator last
+        , parse_policy_set const & parse_policy
+        , ObjectType & obj
+        , error_code & ec)
+{
+    using value_type = typename ObjectType::mapped_type;
+    using string_type = typename ObjectType::key_type;
+
+    basic_callbacks<string_type, value_type> callbacks;
+    string_type member_name;
+
+    callbacks.on_error  = [& ec] (error_code const & e) { ec = e; };
+    callbacks.on_member_name  = [& member_name] (string_type && name) { member_name = std::move(name); };
+    callbacks.on_true   = [& obj, & member_name] { obj[member_name] = true; };
+    callbacks.on_false  = [& obj, & member_name] { obj[member_name] = false; };
+    callbacks.on_number = [& obj, & member_name] (value_type && n) { obj[member_name] = std::forward<value_type>(n); };
+    return parse(first, last, parse_policy, callbacks);
+}
+
+template <typename ForwardIterator, typename ObjectType>
+typename std::enable_if<is_string<typename ObjectType::key_type>::value
+        && is_string<typename ObjectType::mapped_type>::value, ForwardIterator>::type
+parse_object (ForwardIterator first
+        , ForwardIterator last
+        , parse_policy_set const & parse_policy
+        , ObjectType & obj
+        , error_code & ec)
+{
+    using value_type = typename ObjectType::mapped_type;
+    using string_type = typename ObjectType::key_type;
+
+    basic_callbacks<string_type, value_type> callbacks;
+    string_type member_name;
+
+    callbacks.on_error  = [& ec] (error_code const & e) { ec = e; };
+    callbacks.on_member_name  = [& member_name] (string_type && name) { member_name = std::move(name); };
+    callbacks.on_string = [& obj, & member_name] (string_type && s) {
+            obj[member_name] = std::forward<string_type>(s);
+    };
+    return parse(first, last, parse_policy, callbacks);
+}
+
+template <typename ForwardIterator, typename ObjectType>
+inline ForwardIterator parse_object (ForwardIterator first
+        , ForwardIterator last
+        , ObjectType & obj
+        , error_code & ec)
+{
+    return parse_object(first, last, default_policy(), obj, ec);
+}
+
+template <typename ForwardIterator, typename ObjectType>
+inline ForwardIterator parse_object (ForwardIterator first
+        , ForwardIterator last
+        , ObjectType & obj)
+{
+    error_code ec;
+    auto pos = parse_object(first, last, obj, ec);
     if (ec)
         throw std::system_error(ec);
     return pos;

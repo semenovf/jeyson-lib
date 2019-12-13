@@ -11,6 +11,7 @@ doxygen/
 nbproject/
 src/tmp/
 
+.coveralls.yml
 #Makefile
 #Makefile.*
 #makefile

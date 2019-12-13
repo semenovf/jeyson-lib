@@ -465,7 +465,7 @@ TEST_CASE("parse_array of floating points") {
     CHECK(arr[4] == std::stod("0.5"));
 }
 
-TEST_CASE("advance_array of strings") {
+TEST_CASE("parse_array of strings") {
     using pfs::json::parse_array;
     using pfs::json::strict_policy;
 
@@ -484,36 +484,79 @@ TEST_CASE("advance_array of strings") {
     CHECK(arr[2] == "three");
 }
 
-// TEST_CASE("advance_object of integers") {
-//     using pfs::json::advance_object;
-//     using pfs::json::strict_policy;
-//
-//     auto obj_str = std::string{"{\"one\": 1, \"two\": 2, \"three\": 3}"};
-//     std::map<std::string, int> obj;
-//     pfs::json::error_code ec;
-//
-//     auto first = obj_str.begin();
-//     auto last = obj_str.end();
-//     REQUIRE(advance_object(first, last, strict_policy(), obj, ec) == true);
-//     REQUIRE(obj.size() == 3);
-//     CHECK(obj["one"] == 1);
-//     CHECK(obj["two"] == 2);
-//     CHECK(obj["three"] == 3);
-// }
-//
-// TEST_CASE("advance_object of strings") {
-//     using pfs::json::advance_object;
-//     using pfs::json::strict_policy;
-//
-//     auto obj_str = std::string{"{\"one\": \"one\", \"two\": \"two\", \"three\": \"three\"}"};
-//     std::map<std::string, std::string> obj;
-//     pfs::json::error_code ec;
-//
-//     auto first = obj_str.begin();
-//     auto last = obj_str.end();
-//     REQUIRE(advance_object(first, last, strict_policy(), obj, ec) == true);
-//     REQUIRE(obj.size() == 3);
-//     CHECK(obj["one"] == "one");
-//     CHECK(obj["two"] == "two");
-//     CHECK(obj["three"] == "three");
-// }
+TEST_CASE("parse_object of booleans") {
+    using pfs::json::parse_object;
+    using pfs::json::strict_policy;
+
+    auto obj_str = std::string{"{\"one\": true, \"two\": false, \"three\": true}"};
+    std::map<std::string, bool> obj;
+    pfs::json::error_code ec;
+
+    auto first = obj_str.begin();
+    auto last = obj_str.end();
+    auto pos = parse_object(first, last, strict_policy(), obj, ec);
+    REQUIRE(ec == pfs::json::error_code{});
+    REQUIRE(pos == last);
+    REQUIRE(obj.size() == 3);
+    CHECK(obj["one"] == true);
+    CHECK(obj["two"] == false);
+    CHECK(obj["three"] == true);
+}
+
+TEST_CASE("parse_object of integers") {
+    using pfs::json::parse_object;
+    using pfs::json::strict_policy;
+
+    auto obj_str = std::string{"{\"one\": 1, \"two\": 2, \"three\": 3}"};
+    std::map<std::string, int> obj;
+    pfs::json::error_code ec;
+
+    auto first = obj_str.begin();
+    auto last = obj_str.end();
+    auto pos = parse_object(first, last, strict_policy(), obj, ec);
+    REQUIRE(ec == pfs::json::error_code{});
+    REQUIRE(pos == last);
+    REQUIRE(obj.size() == 3);
+    CHECK(obj["one"] == 1);
+    CHECK(obj["two"] == 2);
+    CHECK(obj["three"] == 3);
+}
+
+TEST_CASE("parse_object of floating point") {
+    using pfs::json::parse_object;
+    using pfs::json::strict_policy;
+
+    auto obj_str = std::string{"{\"one\": 0.1, \"two\": 0.2, \"three\": 0.3}"};
+    std::map<std::string, double> obj;
+    pfs::json::error_code ec;
+
+    auto first = obj_str.begin();
+    auto last = obj_str.end();
+    auto pos = parse_object(first, last, strict_policy(), obj, ec);
+    REQUIRE(ec == pfs::json::error_code{});
+    REQUIRE(pos == last);
+    REQUIRE(obj.size() == 3);
+    CHECK(obj["one"] == std::stod("0.1"));
+    CHECK(obj["two"] == std::stod("0.2"));
+    CHECK(obj["three"] == std::stod("0.3"));
+}
+
+TEST_CASE("parse_object of strings") {
+    using pfs::json::parse_object;
+    using pfs::json::strict_policy;
+
+    auto obj_str = std::string{"{\"one\": \"one\", \"two\": \"two\", \"three\": \"three\"}"};
+    std::map<std::string, std::string> obj;
+    pfs::json::error_code ec;
+
+    auto first = obj_str.begin();
+    auto last = obj_str.end();
+    auto pos = parse_object(first, last, strict_policy(), obj, ec);
+    REQUIRE(ec == pfs::json::error_code{});
+    REQUIRE(pos == last);
+    REQUIRE(obj.size() == 3);
+    CHECK(obj["one"] == "one");
+    CHECK(obj["two"] == "two");
+    CHECK(obj["three"] == "three");
+}
+
