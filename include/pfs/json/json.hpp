@@ -57,6 +57,49 @@ using array_type = std::list<ValueType>;
 template <typename KeyType, typename ValueType>
 using object_type = std::map<KeyType, ValueType>;
 
+enum class type_enum : signed char // 8 signed byte
+{
+      null = 0
+    , boolean
+    , integer
+    , uinteger
+    , real
+    , string
+    , object
+    , array
+};
+
+inline std::string to_string (type_enum t)
+{
+    switch (t) {
+        case type_enum::null:     return std::string("null");
+        case type_enum::boolean:  return std::string("boolean");
+        case type_enum::integer:  return std::string("integer");
+        case type_enum::uinteger: return std::string("uinteger");
+        case type_enum::real:     return std::string("real");
+        case type_enum::string:   return std::string("string");
+        case type_enum::array:    return std::string("array");;
+        case type_enum::object:   return std::string("object");
+        default: break;
+    }
+
+    return std::string();
+}
+
+template <typename StringType, typename T>
+typename std::enable_if<std::is_same<StringType, std::string>::value, StringType>::type
+stringify (T const & value)
+{
+    using std::to_string;
+    return to_string(value);
+}
+
+template <typename StringType>
+StringType stringify (bool value)
+{
+    return StringType(value ? "true" : "false");
+}
+
 // Reference JSON class
 template <typename BoolType = bool
         , typename IntegerType = intmax_t
@@ -75,21 +118,10 @@ public:
     using string_type   = StringType;
     using array_type    = ArrayType<value>;
     using object_type   = ObjectType<StringType, value>;
-
-    enum class type : signed char // 8 signed byte
-    {
-          null = 0
-        , boolean
-        , integer
-        , uinteger
-        , real
-        , string
-        , object
-        , array
-    };
+    using size_type     = std::size_t;
 
 protected:
-    type _type;
+    type_enum _type;
 
     union value_rep {
         boolean_type  boolean_value;
@@ -101,32 +133,73 @@ protected:
         object_type * object_value;
 
         value_rep () = default;
-        value_rep (boolean_type v) noexcept : boolean_value(v) {}
-        value_rep (integer_type v) noexcept : integer_value(v) {}
+        value_rep (boolean_type v)  noexcept : boolean_value(v) {}
+        value_rep (integer_type v)  noexcept : integer_value(v) {}
         value_rep (uinteger_type v) noexcept : uinteger_value(v) {}
-        value_rep (real_type v) noexcept : real_value(v) {}
-        value_rep (string_type * v) noexcept : string_value(v) {}
-        value_rep (array_type * v) noexcept : array_value(v) {}
-        value_rep (object_type * v) noexcept : object_value(v) {}
+        value_rep (real_type v)     noexcept : real_value(v) {}
+        value_rep (string_type const & v) : string_value(new string_type(v)) {}
+        value_rep (string_type && v) : string_value(new string_type(std::forward<string_type>(v))) {}
+        value_rep (array_type const & v) : array_value(new array_type(v)) {}
+        value_rep (array_type && v) : array_value(new array_type(std::forward<array_type>(v))) {}
+        value_rep (object_type const & v) : object_value(new object_type(v)) {}
+        value_rep (object_type && v) : object_value(new object_type(std::forward<object_type>(v))) {}
 
-        void destroy (value::type t)
+        value_rep (type_enum t)
         {
             switch (t) {
-                case value::type::string:
+                case type_enum::object:
+                    object_value = new object_type;
+                    break;
+
+                case type_enum::array:
+                    array_value = new array_type;
+                    break;
+
+                case type_enum::string:
+                    string_value = new string_type("");
+                    break;
+
+                case type_enum::boolean:
+                    boolean_value = boolean_type(false);
+                    break;
+
+                case type_enum::integer:
+                    integer_value = integer_type(0);
+                    break;
+
+                case type_enum::uinteger:
+                    uinteger_value = uinteger_type(0);
+                    break;
+
+                case type_enum::real:
+                    real_value = real_type(0.0);
+                    break;
+
+                case type_enum::null:
+                default:
+                    object_value = nullptr;
+                    break;
+            }
+        }
+
+        void destroy (type_enum t)
+        {
+            switch (t) {
+                case type_enum::string:
                     if (string_value) {
                         delete string_value;
                         string_value = nullptr;
                     }
                     break;
 
-                case value::type::array:
+                case type_enum::array:
                     if (array_value) {
                         delete array_value;
                         array_value = nullptr;
                     }
                     break;
 
-                case value::type::object:
+                case type_enum::object:
                     if (object_value) {
                         delete object_value;
                         object_value = nullptr;
@@ -140,45 +213,48 @@ protected:
     } _value;
 
 public:
-    value (std::nullptr_t = nullptr) : _type(type::null)
+    explicit value (type_enum t) : _type(t), _value(t)
     {}
 
-    value (bool v) : _type(type::boolean), _value(boolean_type{v})
+    explicit value (std::nullptr_t = nullptr) : _type(type_enum::null)
+    {}
+
+    explicit value (bool v) : _type(type_enum::boolean), _value(boolean_type{v})
     {}
 
     template <typename T
             , typename std::enable_if<std::is_integral<T>::value && std::is_signed<T>::value, int>::type = 0>
-    value (T v) : _type(type::integer), _value(integer_type{v})
+    explicit value (T v) : _type(type_enum::integer), _value(integer_type{v})
     {}
 
     template <typename T
             , typename std::enable_if<std::is_integral<T>::value && !std::is_signed<T>::value, int>::type = 0>
-    value (T v) : _type(type::uinteger), _value(uinteger_type{v})
+    explicit value (T v) : _type(type_enum::uinteger), _value(uinteger_type{v})
     {}
 
     template <typename T
             , typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
-    value (T v) : _type(type::real), _value(real_type{v})
+    explicit value (T v) : _type(type_enum::real), _value(real_type{v})
     {}
 
-    value (StringType const & v)
-        : _type(type::string)
-        , _value(new StringType{v})
+    explicit value (string_type const & v)
+        : _type(type_enum::string)
+        , _value(v)
     {}
 
     /**
      */
-    value (StringType && v)
-        : _type(type::string)
-        , _value(new StringType{std::forward<StringType>(v)})
+    explicit value (string_type && v)
+        : _type(type_enum::string)
+        , _value(std::forward<string_type>(v))
     {}
 
     /**
      * C-string must be converted to @c string_type
      */
-    value (char const * v)
-        : _type(type::string)
-        , _value(new StringType{v})
+    explicit value (char const * v)
+        : _type(type_enum::string)
+        , _value(string_type(v))
     {}
 
     /**
@@ -190,37 +266,44 @@ public:
 
     /**
      */
+    type_enum type () const noexcept
+    {
+        return _type;
+    }
+
+    /**
+     */
     bool is_null () const noexcept
     {
-        return _type == type::null;
+        return _type == type_enum::null;
     }
 
     /**
      */
     bool is_boolean () const noexcept
     {
-        return _type == type::boolean;
+        return _type == type_enum::boolean;
     }
 
     /**
      */
     bool is_integer () const noexcept
     {
-        return _type == type::integer;
+        return _type == type_enum::integer;
     }
 
     /**
      */
     bool is_uinteger () const noexcept
     {
-        return _type == type::uinteger;
+        return _type == type_enum::uinteger;
     }
 
     /**
      */
     bool is_real () const noexcept
     {
-        return _type == type::real;
+        return _type == type_enum::real;
     }
 
     /**
@@ -234,22 +317,226 @@ public:
      */
     bool is_string () const noexcept
     {
-        return _type == type::string;
+        return _type == type_enum::string;
     }
 
     /**
      */
     bool is_array () const noexcept
     {
-        return _type == type::array;
+        return _type == type_enum::array;
     }
 
     /**
      */
     bool is_object () const noexcept
     {
-        return _type == type::object;
+        return _type == type_enum::object;
     }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Cast operations
+    ////////////////////////////////////////////////////////////////////////////
+
+    // Casting to boolean
+    template <typename T>
+    typename std::enable_if<std::is_same<bool, T>::value,T>::type
+    get () const
+    {
+        switch (_type) {
+            case type_enum::boolean: return _value.boolean_value;
+            case type_enum::integer:
+            case type_enum::uinteger: return _value.integer_value != integer_type(0);
+            case type_enum::real: return _value.real_value != real_type(0.0);
+            default: break;
+        }
+
+        throw make_cast_exception(to_string(_type), "boolean");
+        return T();
+    }
+
+    // Casting to signed integers
+    template <typename T>
+    typename std::enable_if<std::is_integral<T>::value
+            && !std::is_unsigned<T>::value
+            && !std::is_same<bool, T>::value, T>::type
+    get () const
+    {
+        switch (_type) {
+            case type_enum::boolean:  return static_cast<T>(_value.boolean_value);
+            case type_enum::integer:  return static_cast<T>(_value.integer_value);
+            case type_enum::uinteger: return static_cast<T>(_value.uinteger_value);
+            case type_enum::real:     return static_cast<T>(_value.real_value);
+            default: break;
+        }
+
+        throw make_cast_exception(to_string(_type), "signed integer");
+        return T();
+    }
+
+    // Casting to unsigned integers
+    template <typename T>
+    typename std::enable_if<std::is_integral<T>::value
+            && std::is_unsigned<T>::value
+            && !std::is_same<bool, T>::value, T>::type
+    get () const
+    {
+        switch (_type) {
+            case type_enum::boolean:  return static_cast<T>(_value.boolean_value);
+            case type_enum::integer:  return static_cast<T>(_value.integer_value);
+            case type_enum::uinteger: return static_cast<T>(_value.uinteger_value);
+            case type_enum::real:     return static_cast<T>(_value.real_value);
+            default: break;
+        }
+
+        throw make_cast_exception(to_string(_type), "unsigned integer");
+        return T();
+    }
+
+    // Casting to floating point
+    template <typename T>
+    typename std::enable_if<std::is_floating_point<T>::value, T>::type
+    get () const
+    {
+        switch (_type) {
+            case type_enum::boolean:  return static_cast<T>(_value.boolean_value);
+            case type_enum::integer:  return static_cast<T>(_value.integer_value);
+            case type_enum::uinteger: return static_cast<T>(_value.uinteger_value);
+            case type_enum::real:     return static_cast<T>(_value.real_value);
+            default: break;
+        }
+
+        throw make_cast_exception(to_string(_type), "floating point");
+        return T();
+    }
+
+    // Casting to string
+    template <typename T>
+    typename std::enable_if<std::is_same<string_type, T>::value, T>::type
+    get () const
+    {
+        using std::to_string;
+
+        switch (_type) {
+            case type_enum::boolean:  return stringify<string_type>(_value.boolean_value);
+            case type_enum::integer:  return stringify<string_type>(_value.integer_value);
+            case type_enum::uinteger: return stringify<string_type>(_value.uinteger_value);
+            case type_enum::real:     return stringify<string_type>(_value.real_value);
+            case type_enum::string:   return *_value.string_value;
+            default: break;
+        }
+
+        throw make_cast_exception(to_string(_type), "string");
+        return T();
+    }
+
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Collection specific methods
+    //
+    // Capacity
+    ////////////////////////////////////////////////////////////////////////////
+    /**
+     * @brief Returns the number of elements in a JSON value.
+     * @return The return value depends on internal JSON type:
+     *      - null    - `0`
+     *      - boolean - `1`
+     *      - string  - `1`
+     *      - number  - `1`
+     *      - array   - the size() of array
+     *      - object  - the size() of object
+     */
+    size_type size () const noexcept
+    {
+        switch (_type) {
+            case type_enum::null: return 0;
+            case type_enum::array: return _value.array_value->size();
+            case type_enum::object: return _value.object_value->size();
+            default: return 1;
+        }
+    }
+
+    /**
+     * @brief Checks whether the JSON value has no elements.
+     * @return The return value depends on internal JSON type:
+     *      - null    - @c true
+     *      - boolean - @c false
+     *      - string  - @c false
+     *      - number  - @c false
+     *      - array   - @c true if array has no elements, @c false otherwise
+     *      - object  - @c true if object has no elements, @c false otherwise
+     */
+    bool empty () const noexcept
+    {
+        return size() == 0;
+    }
+
+    /**
+     * @brief Returns the maximum number of elements the JSON value is able to hold.
+     * @return The return value depends on internal JSON type:
+     *      - null    - `0`
+     *      - boolean - `1`
+     *      - string  - `1`
+     *      - number  - `1`
+     *      - array   - the max_size() of array
+     *      - object  - the max_size() of object
+     */
+    size_type max_size () const noexcept
+    {
+        switch (_type) {
+            case type_enum::null: return 0;
+            case type_enum::array: return _value.array_value->max_size();
+            case type_enum::object: return _value.object_value->max_size();
+            default: return 1;
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Collection specific methods
+    //
+    // Modifiers
+    ////////////////////////////////////////////////////////////////////////////
+    void clear () noexcept
+    {
+        switch (_type) {
+            case type_enum::boolean:
+                _value.boolean_value = boolean_type(false);
+                break;
+
+            case type_enum::integer:
+                _value.integer_value = integer_type(0);
+                break;
+
+            case type_enum::uinteger:
+                _value.uinteger_value = uinteger_type(0);
+                break;
+
+            case type_enum::real:
+                _value.real_value = real_type(0.0);
+                break;
+
+            case type_enum::string:
+                _value.string_value->clear();
+                break;
+
+            case type_enum::object:
+                _value.object_value->clear();
+                break;
+
+            case type_enum::array:
+                _value.array_value->clear();
+                break;
+
+            case type_enum::null:
+            default:
+                break;
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Array specific methods
+    ////////////////////////////////////////////////////////////////////////////
+
 };
 
 }} // // namespace pfs::json

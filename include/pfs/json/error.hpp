@@ -30,6 +30,9 @@ enum class errc
     , unbalanced_object_bracket
     , bad_member_name
     , bad_json_sequence
+
+//
+    , type_error
 };
 
 class error_category : public std::error_category
@@ -62,6 +65,9 @@ public:
             case static_cast<int>(errc::bad_json_sequence):
                 return std::string{"bad json sequence"};
 
+            case static_cast<int>(errc::type_error):
+                return std::string{"type error"};
+
             default: return std::string{"unknown JSON error"};
         }
     }
@@ -76,6 +82,13 @@ inline std::error_category const & get_error_category ()
 inline std::error_code make_error_code (errc e)
 {
     return std::error_code(static_cast<int>(e), get_error_category());
+}
+
+inline std::system_error make_cast_exception (std::string const & from
+        , std::string const & to)
+{
+    return std::system_error(make_error_code(errc::type_error)
+            , std::string("can not cast from ") + from + " to " + to);
 }
 
 }} // // namespace pfs::json
