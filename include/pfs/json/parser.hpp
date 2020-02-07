@@ -430,7 +430,7 @@ inline bool compare_and_assign (ForwardIterator & a, ForwardIterator b)
 // is_whitespace
 ////////////////////////////////////////////////////////////////////////////////
 /**
- * @return @c true if character is one of symbols:
+ * @return @c true if character is one of the symbols:
  *      - space (%x20),
  *      - horizontal tab (%x09),
  *      - line feed or new line (%x0A),
@@ -1442,7 +1442,7 @@ parse_array (ForwardIterator first
         , error_code & ec)
 {
     using value_type = typename ArrayType::value_type;
-    // No matter the string type here
+    //                   v----------No matter the string type here
     basic_callbacks<std::string, value_type> callbacks;
     callbacks.on_error  = [& ec] (error_code const & e) { ec = e; };
     callbacks.on_true   = [& arr] { arr.emplace_back(static_cast<value_type>(true)); };
@@ -1466,7 +1466,7 @@ parse_array (ForwardIterator first
         , error_code & ec)
 {
     using string_type = typename ArrayType::value_type;
-    // No matter the number type here
+    //                            v------------ No matter the number type here
     basic_callbacks<string_type, int> callbacks;
     callbacks.on_error  = [& ec] (error_code const & e) { ec = e; };
     callbacks.on_string = [& arr] (string_type && s) {
