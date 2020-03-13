@@ -10,6 +10,7 @@ build*/
 doxygen/
 nbproject/
 src/tmp/
+pfs-common/
 
 .coveralls.yml
 #Makefile

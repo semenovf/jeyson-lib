@@ -8,7 +8,9 @@
 //      2019.12.05 Error-specific code moved into `error.h`
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
+#include "constants.hpp"
 #include "error.hpp"
+#include "iterator.hpp"
 #include <list>
 #include <map>
 
@@ -57,18 +59,6 @@ using array_type = std::list<ValueType>;
 template <typename KeyType, typename ValueType>
 using object_type = std::map<KeyType, ValueType>;
 
-enum class type_enum : signed char // 8 signed byte
-{
-      null = 0
-    , boolean
-    , integer
-    , uinteger
-    , real
-    , string
-    , object
-    , array
-};
-
 inline std::string to_string (type_enum t)
 {
     switch (t) {
@@ -111,14 +101,21 @@ template <typename BoolType = bool
 class value
 {
 public:
-    using boolean_type  = BoolType;
-    using integer_type  = IntegerType;
-    using uinteger_type = UIntegerType;
-    using real_type     = RealType;
-    using string_type   = StringType;
-    using array_type    = ArrayType<value>;
-    using object_type   = ObjectType<StringType, value>;
-    using size_type     = std::size_t;
+    using boolean_type    = BoolType;
+    using integer_type    = IntegerType;
+    using uinteger_type   = UIntegerType;
+    using real_type       = RealType;
+    using string_type     = StringType;
+    using array_type      = ArrayType<value>;
+    using object_type     = ObjectType<StringType, value>;
+    using size_type       = std::size_t;
+    using reference       = value &;
+    using const_reference = value const &;
+
+    using iterator = basic_iterator<value>;
+    using const_iterator = basic_iterator<const value>;
+//     using reverse_iterator = json_reverse_iterator<typename basic_json::iterator>;
+//     using const_reverse_iterator = json_reverse_iterator<typename basic_json::const_iterator>;
 
 protected:
     type_enum _type;
@@ -344,11 +341,18 @@ public:
     get () const
     {
         switch (_type) {
-            case type_enum::boolean: return _value.boolean_value;
+            case type_enum::boolean:
+                return _value.boolean_value;
+
             case type_enum::integer:
-            case type_enum::uinteger: return _value.integer_value != integer_type(0);
-            case type_enum::real: return _value.real_value != real_type(0.0);
-            default: break;
+            case type_enum::uinteger:
+                return _value.integer_value != integer_type(0);
+
+            case type_enum::real:
+                return _value.real_value != real_type(0.0);
+
+            default:
+                break;
         }
 
         throw make_cast_exception(to_string(_type), "boolean");
@@ -430,6 +434,93 @@ public:
         return T();
     }
 
+    ////////////////////////////////////////////////////////////////////////////
+    // Iterators
+    ////////////////////////////////////////////////////////////////////////////
+private:
+    template <typename Iterator>
+    Iterator begin () noexcept
+    {
+        switch (_type) {
+            case type_enum::null:     return Iterator{};
+            case type_enum::boolean:  return Iterator{& _value.boolean_value};
+            case type_enum::integer:  return Iterator{& _value.integer_value};
+            case type_enum::uinteger: return Iterator{& _value.uinteger_value};
+            case type_enum::real:     return Iterator{& _value.real_value};
+            case type_enum::string:   return Iterator{& _value.string_value};
+            case type_enum::array:    return Iterator{_value.array_value.begin()};
+            case type_enum::object:   return Iterator{_value.object_value.begin()};
+            default:
+                static_assert("Unexpected choice");
+                break;
+        }
+
+        return Iterator{};
+    }
+
+    template <typename Iterator>
+    Iterator end () noexcept
+    {
+        switch (_type) {
+            case type_enum::null:     return Iterator{};
+            case type_enum::boolean:  return Iterator{(& _value.boolean_value) + 1};
+            case type_enum::integer:  return Iterator{(& _value.integer_value) + 1};
+            case type_enum::uinteger: return Iterator{(& _value.uinteger_value) + 1};
+            case type_enum::real:     return Iterator{(& _value.real_value) + 1};
+            case type_enum::string:   return Iterator{(& _value.string_value) + 1};
+            case type_enum::array:    return Iterator{_value.array_value.end()};
+            case type_enum::object:   return Iterator{_value.object_value.end()};
+            default:
+                static_assert("Unexpected choice");
+                break;
+        }
+
+        return Iterator{};
+    }
+
+public:
+    iterator begin () noexcept
+    {
+        return begin<iterator>();
+    }
+
+    const_iterator begin () const noexcept
+    {
+        return begin<const_iterator>();
+    }
+
+    const_iterator cbegin () const noexcept
+    {
+        return begin<const_iterator>();
+    }
+
+    iterator end () noexcept
+    {
+        return end<iterator>();
+    }
+
+    const_iterator end () const noexcept
+    {
+        return end<const_iterator>();
+    }
+
+    const_iterator cend () const noexcept
+    {
+        return end<const_iterator>();
+    }
+
+    // TODO
+//     reverse_iterator rbegin () noexcept;
+//
+//     const_reverse_iterator rbegin () const noexcept;
+//
+//     const_reverse_iterator crbegin () const noexcept;
+//
+//     reverse_iterator rend () noexcept;
+//
+//     const_reverse_iterator rend () const noexcept;
+//
+//     const_reverse_iterator crend () const noexcept;
 
     ////////////////////////////////////////////////////////////////////////////
     // Collection specific methods
@@ -448,12 +539,23 @@ public:
      */
     size_type size () const noexcept
     {
+        size_type result = 1;
+
         switch (_type) {
-            case type_enum::null: return 0;
-            case type_enum::array: return _value.array_value->size();
-            case type_enum::object: return _value.object_value->size();
-            default: return 1;
+            case type_enum::null:
+                result = 0;
+                break;
+            case type_enum::array:
+                result = _value.array_value->size();
+                break;
+            case type_enum::object:
+                result = _value.object_value->size();
+                break;
+            default:
+                break;
         }
+
+        return result;
     }
 
     /**
@@ -483,12 +585,23 @@ public:
      */
     size_type max_size () const noexcept
     {
+        size_type result = 1;
+
         switch (_type) {
-            case type_enum::null: return 0;
-            case type_enum::array: return _value.array_value->max_size();
-            case type_enum::object: return _value.object_value->max_size();
-            default: return 1;
+            case type_enum::null:
+                result = 0;
+                break;
+            case type_enum::array:
+                result = _value.array_value->max_size();
+                break;
+            case type_enum::object:
+                result = _value.object_value->max_size();
+                break;
+            default:
+                break;
         }
+
+        return result;
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -536,7 +649,29 @@ public:
     ////////////////////////////////////////////////////////////////////////////
     // Array specific methods
     ////////////////////////////////////////////////////////////////////////////
+    void push_back (value && v)
+    {
+        std::cout << "push_back (value &&): " << to_string(v.type()) << "\n";
+    }
 
+    reference operator += (value && v)
+    {
+        std::cout << "reference operator += (value &&): " << to_string(v.type()) << "\n";
+        push_back(std::forward<value>(v));
+        return *this;
+    }
+
+    void push_back (value const & v)
+    {
+        std::cout << "push_back (value const &): " << to_string(v.type()) << "\n";
+    }
+
+    reference operator += (value const & v)
+    {
+        std::cout << "reference operator += (value const &): " << to_string(v.type()) << "\n";
+        push_back(v);
+        return *this;
+    }
 };
 
 }} // // namespace pfs::json

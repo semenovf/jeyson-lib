@@ -1,6 +1,8 @@
 project(pfs_json_TESTS)
 option(pfs_json_COVERAGE "Build tests with coverage support" OFF)
 
+include_directories(${CMAKE_SOURCE_DIR}/pfs-common/include)
+
 if (pfs_json_COVERAGE)
     message(STATUS "Coverage feature enabled")
     if (NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")

@@ -3,7 +3,7 @@
 #include "pfs/json/json.hpp"
 #include <limits>
 
-TEST_CASE("JSON constructors") {
+TEST_CASE("Constructors") {
     using json_value = pfs::json::value<>;
     using type_enum = pfs::json::type_enum;
 
@@ -208,7 +208,7 @@ TEST_CASE("JSON constructors") {
     }
 }
 
-TEST_CASE("JSON explicit cast methods") {
+TEST_CASE("Cast") {
     using json_value = pfs::json::value<>;
     using std::to_string;
     using pfs::json::to_string;
@@ -327,7 +327,7 @@ TEST_CASE("JSON explicit cast methods") {
     }
 }
 
-TEST_CASE("JSON Collection specific methods - Capacity") {
+TEST_CASE("Capacity") {
     using json_value = pfs::json::value<>;
     using type_enum = pfs::json::type_enum;
 
@@ -380,8 +380,9 @@ TEST_CASE("JSON Collection specific methods - Capacity") {
     }
 }
 
-TEST_CASE("JSON Collection specific methods - Modifiers") {
+TEST_CASE("Modifiers") {
     using json_value = pfs::json::value<>;
+    using type_enum = pfs::json::type_enum;
 
     {   // Null
         json_value v;
@@ -415,10 +416,35 @@ TEST_CASE("JSON Collection specific methods - Modifiers") {
     }
 
     {
-        // TODO Array
+        // Array
+        json_value v(type_enum::array);
+//         v.push_back(std::move(nullptr));
+//         v += nullptr;
+
+//         int x = 10;
+//         v.push_back(x);
+
+//         json_value arr(type_enum::array);
+//         v.push_back(std::move(arr));
+//
+//         json_value obj(type_enum::object);
+//         v.push_back(std::move(obj));
+
+//         CHECK(v.empty());
+//         CHECK(v.size() == 0);
+//         CHECK(v.max_size() == json_value::array_type().max_size());
     }
 
     {
-        // TODO Object
+        // Object
+        json_value v(type_enum::object);
+//         CHECK(v.empty());
+//         CHECK(v.size() == 0);
+//         CHECK(v.max_size() == json_value::object_type().max_size());
     }
+}
+
+TEST_CASE("Iterators") {
+    using json_value = pfs::json::value<>;
+    using type_enum = pfs::json::type_enum;
 }
