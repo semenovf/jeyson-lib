@@ -13,6 +13,7 @@
 #include "iterator.hpp"
 #include <list>
 #include <map>
+#include <cassert>
 
 namespace pfs {
 namespace json {
@@ -451,7 +452,7 @@ private:
             case type_enum::array:    return Iterator{_value.array_value.begin()};
             case type_enum::object:   return Iterator{_value.object_value.begin()};
             default:
-                static_assert("Unexpected choice");
+                assert(false);
                 break;
         }
 
@@ -471,7 +472,7 @@ private:
             case type_enum::array:    return Iterator{_value.array_value.end()};
             case type_enum::object:   return Iterator{_value.object_value.end()};
             default:
-                static_assert("Unexpected choice");
+                assert(false);
                 break;
         }
 
