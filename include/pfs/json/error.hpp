@@ -33,6 +33,7 @@ enum class errc
 
 //
     , type_error
+    , null_pointer
 };
 
 class error_category : public std::error_category
@@ -68,6 +69,9 @@ public:
             case static_cast<int>(errc::type_error):
                 return std::string{"type error"};
 
+            case static_cast<int>(errc::null_pointer):
+                return std::string{"null pointer"};
+
             default: return std::string{"unknown JSON error"};
         }
     }
@@ -82,6 +86,11 @@ inline std::error_category const & get_error_category ()
 inline std::error_code make_error_code (errc e)
 {
     return std::error_code(static_cast<int>(e), get_error_category());
+}
+
+inline std::system_error make_exception (errc e)
+{
+    return std::system_error(make_error_code(e));
 }
 
 inline std::system_error make_cast_exception (std::string const & from

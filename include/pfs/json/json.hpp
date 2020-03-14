@@ -11,6 +11,7 @@
 #include "constants.hpp"
 #include "error.hpp"
 #include "iterator.hpp"
+#include "pfs/compare.hpp"
 #include <list>
 #include <map>
 #include <cassert>
@@ -99,7 +100,7 @@ template <typename BoolType = bool
         , typename StringType = std::string
         , template <typename> class ArrayType = array_type
         , template <typename, typename> class ObjectType = object_type>
-class value
+class value : public compare_operations
 {
 public:
     using boolean_type    = BoolType;
@@ -115,8 +116,8 @@ public:
 
     using iterator = basic_iterator<value>;
     using const_iterator = basic_iterator<const value>;
-//     using reverse_iterator = json_reverse_iterator<typename basic_json::iterator>;
-//     using const_reverse_iterator = json_reverse_iterator<typename basic_json::const_iterator>;
+    using reverse_iterator = std::reverse_iterator<iterator>;
+    using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
 protected:
     type_enum _type;
@@ -442,41 +443,22 @@ private:
     template <typename Iterator>
     Iterator begin () noexcept
     {
-        switch (_type) {
-            case type_enum::null:     return Iterator{};
-            case type_enum::boolean:  return Iterator{& _value.boolean_value};
-            case type_enum::integer:  return Iterator{& _value.integer_value};
-            case type_enum::uinteger: return Iterator{& _value.uinteger_value};
-            case type_enum::real:     return Iterator{& _value.real_value};
-            case type_enum::string:   return Iterator{& _value.string_value};
-            case type_enum::array:    return Iterator{_value.array_value.begin()};
-            case type_enum::object:   return Iterator{_value.object_value.begin()};
-            default:
-                assert(false);
-                break;
-        }
-
-        return Iterator{};
+        return Iterator{this};
     }
 
     template <typename Iterator>
     Iterator end () noexcept
     {
         switch (_type) {
-            case type_enum::null:     return Iterator{};
-            case type_enum::boolean:  return Iterator{(& _value.boolean_value) + 1};
-            case type_enum::integer:  return Iterator{(& _value.integer_value) + 1};
-            case type_enum::uinteger: return Iterator{(& _value.uinteger_value) + 1};
-            case type_enum::real:     return Iterator{(& _value.real_value) + 1};
-            case type_enum::string:   return Iterator{(& _value.string_value) + 1};
-            case type_enum::array:    return Iterator{_value.array_value.end()};
-            case type_enum::object:   return Iterator{_value.object_value.end()};
+            case type_enum::array:
+                return Iterator{_value.array_value->end()};
+            case type_enum::object:
+                return Iterator{_value.object_value->end()};
             default:
-                assert(false);
                 break;
         }
 
-        return Iterator{};
+        return Iterator{this + 1};
     }
 
 public:
@@ -672,6 +654,54 @@ public:
         std::cout << "reference operator += (value const &): " << to_string(v.type()) << "\n";
         push_back(v);
         return *this;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Comparison
+    ////////////////////////////////////////////////////////////////////////////
+    friend bool operator == (value const & lhs, value const & rhs)
+    {
+        if (& lhs == & rhs)
+            return true;
+
+        if (lhs.type() != rhs.type())
+            return false;
+
+        switch (lhs.type()) {
+            case type_enum::boolean:
+                return lhs._value.boolean_value
+                        == rhs._value.boolean_value;
+
+            case type_enum::integer:
+                return lhs._value.integer_value
+                        == rhs._value.integer_value;
+
+            case type_enum::uinteger:
+                return lhs._value.uinteger_value
+                        == rhs._value.uinteger_value;
+
+            case type_enum::real:
+                return lhs._value.real_value
+                        == rhs._value.real_value;
+
+            case type_enum::string:
+                return *lhs._value.string_value
+                        == *rhs._value.string_value;
+
+            case type_enum::array:
+                return *lhs._value.array_value
+                        == *rhs._value.array_value;
+
+            case type_enum::object:
+                return *lhs._value.object_value
+                        == *rhs._value.object_value;
+
+            case type_enum::null:
+            default:
+                return true;
+        }
+
+        return false;
     }
 };
 

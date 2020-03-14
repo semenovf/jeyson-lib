@@ -19,8 +19,8 @@ enum class type_enum : signed char // 8 signed byte
     , uinteger
     , real
     , string
-    , object
     , array
+    , object
 };
 
 template <type_enum I>
