@@ -14,6 +14,7 @@
 #include "pfs/compare.hpp"
 #include <list>
 #include <map>
+#include <utility>
 #include <cassert>
 
 namespace pfs {
@@ -56,7 +57,7 @@ namespace json {
 // };
 
 template <typename ValueType>
-using array_type = std::list<ValueType>;
+using array_type = std::vector<ValueType>;
 
 template <typename KeyType, typename ValueType>
 using object_type = std::map<KeyType, ValueType>;
@@ -131,7 +132,7 @@ protected:
         array_type *  array_value;
         object_type * object_value;
 
-        value_rep () = default;
+        value_rep () : value_rep(type_enum::null) {}
         value_rep (boolean_type v)  noexcept : boolean_value(v) {}
         value_rep (integer_type v)  noexcept : integer_value(v) {}
         value_rep (uinteger_type v) noexcept : uinteger_value(v) {}
@@ -181,6 +182,11 @@ protected:
             }
         }
 
+        void nullify ()
+        {
+            object_value = nullptr;
+        }
+
         void destroy (type_enum t)
         {
             switch (t) {
@@ -212,38 +218,50 @@ protected:
     } _value;
 
 public:
-    explicit value (type_enum t) : _type(t), _value(t)
+    value (type_enum t)
+        : _type(t)
+        , _value(t)
     {}
 
-    explicit value (std::nullptr_t = nullptr) : _type(type_enum::null)
+    value (std::nullptr_t = nullptr)
+        : _type(type_enum::null)
+        , _value()
     {}
 
-    explicit value (bool v) : _type(type_enum::boolean), _value(boolean_type{v})
+    value (bool v)
+        : _type(type_enum::boolean)
+        , _value(boolean_type{v})
     {}
 
     template <typename T
             , typename std::enable_if<std::is_integral<T>::value && std::is_signed<T>::value, int>::type = 0>
-    explicit value (T v) : _type(type_enum::integer), _value(integer_type{v})
+    value (T v)
+        : _type(type_enum::integer)
+        , _value(integer_type{v})
     {}
 
     template <typename T
             , typename std::enable_if<std::is_integral<T>::value && !std::is_signed<T>::value, int>::type = 0>
-    explicit value (T v) : _type(type_enum::uinteger), _value(uinteger_type{v})
+    value (T v)
+        : _type(type_enum::uinteger)
+        , _value(uinteger_type{v})
     {}
 
     template <typename T
             , typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
-    explicit value (T v) : _type(type_enum::real), _value(real_type{v})
+    value (T v)
+        : _type(type_enum::real)
+        , _value(real_type{v})
     {}
 
-    explicit value (string_type const & v)
+    value (string_type const & v)
         : _type(type_enum::string)
         , _value(v)
     {}
 
     /**
      */
-    explicit value (string_type && v)
+    value (string_type && v)
         : _type(type_enum::string)
         , _value(std::forward<string_type>(v))
     {}
@@ -251,16 +269,72 @@ public:
     /**
      * C-string must be converted to @c string_type
      */
-    explicit value (char const * v)
+    value (char const * v)
         : _type(type_enum::string)
         , _value(string_type(v))
     {}
+
+    value (value const & other)
+        : _type(other._type)
+    {
+        switch (_type) {
+            case type_enum::boolean:
+                _value.boolean_value = other._value.boolean_value;
+                break;
+
+            case type_enum::integer:
+                _value.integer_value = other._value.integer_value;
+                break;
+
+            case type_enum::uinteger:
+                _value.uinteger_value = other._value.uinteger_value;
+                break;
+
+            case type_enum::real:
+                _value.real_value = other._value.real_value;
+                break;
+
+            case type_enum::string:
+                _value = *other._value.string_value;
+                break;
+
+            case type_enum::array:
+                _value = *other._value.array_value;
+                break;
+
+            case type_enum::object:
+                _value = *other._value.object_value;
+                break;
+
+            case type_enum::null:
+            default:
+                break;
+        }
+    }
+
+    value (value && other) noexcept
+        : _type(std::move(other._type))
+        , _value(std::move(other._value))
+    {
+        other._type = type_enum::null;
+        other._value.nullify();
+    }
 
     /**
      */
     ~value ()
     {
         _value.destroy(_type);
+    }
+
+    value & operator = (value rhs)
+    {
+        using std::swap;
+
+        swap(_type, rhs._type);
+        swap(_value, rhs._value);
+
+        return *this;
     }
 
     /**
@@ -307,6 +381,13 @@ public:
 
     /**
      */
+    bool is_integral () const noexcept
+    {
+        return is_integer() || is_uinteger();
+    }
+
+    /**
+     */
     bool is_number () const noexcept
     {
         return is_integer() || is_uinteger() || is_real();
@@ -331,6 +412,57 @@ public:
     bool is_object () const noexcept
     {
         return _type == type_enum::object;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Element access
+    ////////////////////////////////////////////////////////////////////////////
+    reference operator [] (size_type pos)
+    {
+        if (is_null()) {
+            _type = type_enum::array;
+            _value = value_rep(_type);
+        }
+
+        if (!is_array())
+            throw make_exception(errc::type_error);
+
+        if (pos >= _value.array_value->size()) {
+            _value.array_value->insert(_value.array_value->end()
+                    , pos - _value.array_value->size() + 1
+                    , value());
+        }
+
+        return _value.array_value->operator[](pos);
+    }
+
+    const_reference operator [] (size_type pos) const
+    {
+        if (!is_array())
+            throw make_exception(errc::type_error);
+
+        return _value.array_value->operator[](pos);
+    }
+
+    reference operator [] (typename object_type::key_type const & key)
+    {
+        if (is_null()) {
+            _type = type_enum::object;
+            _value = value_rep(_type);
+        }
+
+        if (!is_object())
+            throw make_exception(errc::type_error);
+
+        return _value.object_value->operator[](key);
+    }
+
+    const_reference operator [] (typename object_type::key_type const & key) const
+    {
+        if (!is_object())
+            throw make_exception(errc::type_error);
+
+        return _value.object_value->find(key)->second;
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -615,12 +747,12 @@ public:
                 _value.string_value->clear();
                 break;
 
-            case type_enum::object:
-                _value.object_value->clear();
-                break;
-
             case type_enum::array:
                 _value.array_value->clear();
+                break;
+
+            case type_enum::object:
+                _value.object_value->clear();
                 break;
 
             case type_enum::null:
@@ -664,8 +796,36 @@ public:
         if (& lhs == & rhs)
             return true;
 
-        if (lhs.type() != rhs.type())
+        if (lhs.type() != rhs.type()) {
+
+            if (lhs.is_integral() && rhs.is_integral()) {
+                if (lhs.is_integer() && lhs.is_uinteger()) {
+                    return (lhs._value.integer_value < 0)
+                            ? false
+                            : static_cast<uinteger_type>(lhs._value.integer_value)
+                                    == rhs._value.uinteger_value;
+                } else {
+                    return (rhs._value.integer_value < 0)
+                            ? false
+                            : static_cast<uinteger_type>(rhs._value.integer_value)
+                                    == lhs._value.uinteger_value;
+                }
+            } else if (lhs.is_integer() && rhs.is_real()) {
+                return static_cast<real_type>(lhs._value.integer_value)
+                        == rhs._value.real_value;
+            } else if (lhs.is_real() && rhs.is_integer()) {
+                return lhs._value.real_value
+                        == static_cast<real_type>(rhs._value.integer_value);
+            } else if (lhs.is_uinteger() && rhs.is_real()) {
+                return static_cast<real_type>(lhs._value.uinteger_value)
+                        == rhs._value.real_value;
+            } else if (lhs.is_real() && rhs.is_uinteger()) {
+                return lhs._value.real_value
+                        == static_cast<real_type>(rhs._value.uinteger_value);
+            }
+
             return false;
+        }
 
         switch (lhs.type()) {
             case type_enum::boolean:
