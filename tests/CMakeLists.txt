@@ -19,6 +19,9 @@ file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION .)
 add_executable(json json.cpp)
 add_test(NAME json COMMAND json)
 
+add_executable(iterator iterator.cpp)
+add_test(NAME iterator COMMAND iterator)
+
 add_executable(parser parser.cpp)
 add_test(NAME parser COMMAND parser)
 

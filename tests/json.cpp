@@ -184,8 +184,7 @@ TEST_CASE("Constructors") {
     }
 
     {
-        json_value v;
-        v[0] = nullptr;
+        json_value v = type_enum::array;
         CHECK(v.type() == type_enum::array);
 
         CHECK(v.is_array());
@@ -197,22 +196,20 @@ TEST_CASE("Constructors") {
     }
 
     {
-        // FIXME
-//         json_value v(type_enum::object);
-//         CHECK(v.type() == type_enum::object);
-//
-//         CHECK(v.is_object());
-//         CHECK_FALSE(v.is_null());
-//         CHECK_FALSE(v.is_boolean());
-//         CHECK_FALSE(v.is_number());
-//         CHECK_FALSE(v.is_string());
-//         CHECK_FALSE(v.is_array());
+        json_value v = type_enum::object;
+        CHECK(v.type() == type_enum::object);
+
+        CHECK(v.is_object());
+        CHECK_FALSE(v.is_null());
+        CHECK_FALSE(v.is_boolean());
+        CHECK_FALSE(v.is_number());
+        CHECK_FALSE(v.is_string());
+        CHECK_FALSE(v.is_array());
     }
 }
 
 TEST_CASE("Assign") {
     using json_value = pfs::json::value<>;
-    using type_enum = pfs::json::type_enum;
 
     {
         json_value v;
@@ -252,195 +249,24 @@ TEST_CASE("Assign") {
         CHECK(v[5].is_array());
         CHECK(v[5][0].is_null());
         CHECK(v[5][5] == "Hello");
-    }
 
-    {
-//         json_value v(true);
-//         CHECK(v.type() == type_enum::boolean);
-//         CHECK(v.is_boolean());
-//         CHECK_FALSE(v.is_null());
-//         CHECK_FALSE(v.is_number());
-//         CHECK_FALSE(v.is_string());
-//         CHECK_FALSE(v.is_array());
-//         CHECK_FALSE(v.is_object());
-    }
+        json_value obj;
+        arr["null"] = nullptr;
+        arr["boolean"] = true;
+        arr["integer"] = -13;
+        arr["unsigned"] = uint8_t{13};
+        arr["real"] = 3.14;
+        arr["C-string"] = "Hello";
+        arr["string"] = std::string{"Hello"};
 
-    {
-//         json_value v(false);
-//         CHECK(v.type() == type_enum::boolean);
-//         CHECK(v.is_boolean());
-//         CHECK_FALSE(v.is_null());
-//         CHECK_FALSE(v.is_number());
-//         CHECK_FALSE(v.is_string());
-//         CHECK_FALSE(v.is_array());
-//         CHECK_FALSE(v.is_object());
-    }
+        std::string s1 {"Hello"};
 
-    {
-//         json_value v(std::numeric_limits<int>::min());
-//         CHECK(v.type() == type_enum::integer);
-//         CHECK(v.is_integer());
-//         CHECK(v.is_number());
-//         CHECK_FALSE(v.is_null());
-//         CHECK_FALSE(v.is_boolean());
-//         CHECK_FALSE(v.is_string());
-//         CHECK_FALSE(v.is_array());
-//         CHECK_FALSE(v.is_object());
-    }
+        arr["moved string"] = std::move(s1);
+        v[6] = std::move(arr);
 
-    {
-//         json_value v(std::numeric_limits<int>::max());
-//         CHECK(v.type() == type_enum::integer);
-//         CHECK(v.is_integer());
-//         CHECK(v.is_number());
-//         CHECK_FALSE(v.is_null());
-//         CHECK_FALSE(v.is_boolean());
-//         CHECK_FALSE(v.is_string());
-//         CHECK_FALSE(v.is_array());
-//         CHECK_FALSE(v.is_object());
-    }
-
-    {
-//         json_value v(std::numeric_limits<unsigned int>::min());
-//         CHECK(v.type() == type_enum::uinteger);
-//         CHECK(v.is_uinteger());
-//         CHECK(v.is_number());
-//         CHECK_FALSE(v.is_null());
-//         CHECK_FALSE(v.is_boolean());
-//         CHECK_FALSE(v.is_string());
-//         CHECK_FALSE(v.is_array());
-//         CHECK_FALSE(v.is_object());
-    }
-
-    {
-//         json_value v(std::numeric_limits<unsigned int>::max());
-//         CHECK(v.type() == type_enum::uinteger);
-//         CHECK(v.is_uinteger());
-//         CHECK(v.is_number());
-//         CHECK_FALSE(v.is_null());
-//         CHECK_FALSE(v.is_boolean());
-//         CHECK_FALSE(v.is_string());
-//         CHECK_FALSE(v.is_array());
-//         CHECK_FALSE(v.is_object());
-    }
-
-    {
-//         json_value v(std::numeric_limits<float>::min());
-//         CHECK(v.type() == type_enum::real);
-//         CHECK(v.is_real());
-//         CHECK(v.is_number());
-//         CHECK_FALSE(v.is_null());
-//         CHECK_FALSE(v.is_boolean());
-//         CHECK_FALSE(v.is_string());
-//         CHECK_FALSE(v.is_array());
-//         CHECK_FALSE(v.is_object());
-    }
-
-    {
-//         json_value v(std::numeric_limits<float>::max());
-//         CHECK(v.type() == type_enum::real);
-//         CHECK(v.is_real());
-//         CHECK(v.is_number());
-//         CHECK_FALSE(v.is_null());
-//         CHECK_FALSE(v.is_boolean());
-//         CHECK_FALSE(v.is_string());
-//         CHECK_FALSE(v.is_array());
-//         CHECK_FALSE(v.is_object());
-    }
-
-    {
-//         json_value v(std::numeric_limits<double>::min());
-//         CHECK(v.type() == type_enum::real);
-//         CHECK(v.is_real());
-//         CHECK(v.is_number());
-//         CHECK_FALSE(v.is_null());
-//         CHECK_FALSE(v.is_boolean());
-//         CHECK_FALSE(v.is_string());
-//         CHECK_FALSE(v.is_array());
-//         CHECK_FALSE(v.is_object());
-    }
-
-    {
-//         json_value v(std::numeric_limits<double>::max());
-//         CHECK(v.type() == type_enum::real);
-//         CHECK(v.is_real());
-//         CHECK(v.is_number());
-//         CHECK_FALSE(v.is_null());
-//         CHECK_FALSE(v.is_boolean());
-//         CHECK_FALSE(v.is_string());
-//         CHECK_FALSE(v.is_array());
-//         CHECK_FALSE(v.is_object());
-    }
-
-    {
-//         json_value v(0);
-//         CHECK(v.type() == type_enum::integer);
-//         CHECK(v.is_integer());
-//         CHECK(v.is_number());
-//         CHECK_FALSE(v.is_null());
-//         CHECK_FALSE(v.is_boolean());
-//         CHECK_FALSE(v.is_string());
-//         CHECK_FALSE(v.is_array());
-//         CHECK_FALSE(v.is_object());
-    }
-
-    {
-//         json_value v(-1);
-//         CHECK(v.type() == type_enum::integer);
-//         CHECK(v.is_integer());
-//         CHECK(v.is_number());
-//         CHECK_FALSE(v.is_null());
-//         CHECK_FALSE(v.is_boolean());
-//         CHECK_FALSE(v.is_string());
-//         CHECK_FALSE(v.is_array());
-//         CHECK_FALSE(v.is_object());
-    }
-
-    {
-//         json_value v(1);
-//         CHECK(v.type() == type_enum::integer);
-//         CHECK(v.is_integer());
-//         CHECK(v.is_number());
-//         CHECK_FALSE(v.is_null());
-//         CHECK_FALSE(v.is_boolean());
-//         CHECK_FALSE(v.is_string());
-//         CHECK_FALSE(v.is_array());
-//         CHECK_FALSE(v.is_object());
-    }
-
-    {
-//         json_value v("hello");
-//         CHECK(v.type() == type_enum::string);
-//         CHECK(v.is_string());
-//         CHECK_FALSE(v.is_null());
-//         CHECK_FALSE(v.is_boolean());
-//         CHECK_FALSE(v.is_number());
-//         CHECK_FALSE(v.is_array());
-//         CHECK_FALSE(v.is_object());
-    }
-
-    {
-//         json_value v(type_enum::array);
-//         CHECK(v.type() == type_enum::array);
-//
-//         CHECK(v.is_array());
-//         CHECK_FALSE(v.is_null());
-//         CHECK_FALSE(v.is_boolean());
-//         CHECK_FALSE(v.is_number());
-//         CHECK_FALSE(v.is_string());
-//         CHECK_FALSE(v.is_object());
-    }
-
-    {
-//         json_value v(type_enum::object);
-//         CHECK(v.type() == type_enum::object);
-//
-//         CHECK(v.is_object());
-//         CHECK_FALSE(v.is_null());
-//         CHECK_FALSE(v.is_boolean());
-//         CHECK_FALSE(v.is_number());
-//         CHECK_FALSE(v.is_string());
-//         CHECK_FALSE(v.is_array());
+        CHECK(v[6].is_object());
+        CHECK(v[6]["null"].is_null());
+        CHECK(v[6]["moved string"] == "Hello");
     }
 }
 
@@ -552,14 +378,6 @@ TEST_CASE("Cast") {
         CHECK_THROWS_AS(v.get<float>(), std::system_error);
         CHECK_THROWS_AS(v.get<double>(), std::system_error);
         CHECK(v.get<json_value::string_type>() == sample_value);
-    }
-
-    {
-        // TODO Array
-    }
-
-    {
-        // TODO Object
     }
 }
 
@@ -683,59 +501,3 @@ TEST_CASE("Modifiers") {
 //         CHECK(v.max_size() == json_value::object_type().max_size());
     }
 }
-
-TEST_CASE("Iterators") {
-    using json_value = pfs::json::value<>;
-    using type_enum = pfs::json::type_enum;
-
-    // Scalar values
-    {
-        std::vector<json_value> values {json_value{}
-                , json_value{true}
-                , json_value{std::numeric_limits<int>::min()}
-                , json_value{"hello"} };
-
-        for (json_value & v: values) {
-            auto first = std::begin(v);
-            auto last = std::end(v);
-            CHECK(first != last);
-            CHECK(++first == last);
-        }
-
-        auto first = values[0].begin();
-        CHECK(first->is_null());
-
-        first = values[1].begin();
-        CHECK(first->is_boolean());
-        CHECK(first->get<bool>() == true);
-    }
-
-    {
-        // Array
-        // FIXME
-//         json_value v(type_enum::array);
-//         v.push_back(std::move(nullptr));
-//         v += nullptr;
-
-//         int x = 10;
-//         v.push_back(x);
-
-//         json_value arr(type_enum::array);
-//         v.push_back(std::move(arr));
-//
-//         json_value obj(type_enum::object);
-//         v.push_back(std::move(obj));
-
-//         CHECK(v.empty());
-//         CHECK(v.size() == 0);
-//         CHECK(v.max_size() == json_value::array_type().max_size());
-    }
-
-    {
-        // Object
-        // FIXME
-//         json_value v(type_enum::object);
-//         CHECK(v.empty());
-//         CHECK(v.size() == 0);
-//         CHECK(v.max_size() == json_value::object_type().max_size());
-    }}
