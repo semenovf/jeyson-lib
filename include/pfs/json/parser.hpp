@@ -220,11 +220,11 @@ using parse_policy_set = std::bitset<parse_policy_count>;
 ////////////////////////////////////////////////////////////////////////////////
 // basic_callbacks
 ////////////////////////////////////////////////////////////////////////////////
-template <typename StringType, typename NumberType>
+template <typename _StringType, typename _NumberType>
 struct basic_callbacks
 {
-    using number_type = NumberType;
-    using string_type = StringType;
+    using number_type = _NumberType;
+    using string_type = _StringType;
 
     std::function<void(error_code const &)> on_error = [] (error_code const &) {};
     std::function<void()> on_null = [] {};
@@ -242,15 +242,15 @@ struct basic_callbacks
 ////////////////////////////////////////////////////////////////////////////////
 //
 ////////////////////////////////////////////////////////////////////////////////
-template <typename ForwardIterator>
+template <typename _ForwardIterator>
 struct line_counter_iterator
 {
     size_t _lineno = 0;
-    ForwardIterator _it;
+    _ForwardIterator _it;
     bool _is_CR = false;
 
 public:
-    line_counter_iterator (ForwardIterator initial)
+    line_counter_iterator (_ForwardIterator initial)
         : _it(initial)
     {}
 
@@ -415,8 +415,8 @@ inline bool strtoreal (double & n, std::string const & numstr)
 /**
  * Helper function assigns @a b to @a a if @a a != @a b.
  */
-template <typename ForwardIterator>
-inline bool compare_and_assign (ForwardIterator & a, ForwardIterator b)
+template <typename _ForwardIterator>
+inline bool compare_and_assign (_ForwardIterator & a, _ForwardIterator b)
 {
     if (a != b) {
         a = b;
@@ -438,13 +438,13 @@ inline bool compare_and_assign (ForwardIterator & a, ForwardIterator b)
  *
  *      otherwise @c false.
  */
-template <typename CharT>
-inline bool is_whitespace (CharT ch)
+template <typename _CharT>
+inline bool is_whitespace (_CharT ch)
 {
-    return (ch == CharT('\x20')
-            || ch == CharT('\x09')
-            || ch == CharT('\x0A')
-            || ch == CharT('\x0D'));
+    return (ch == _CharT('\x20')
+            || ch == _CharT('\x09')
+            || ch == _CharT('\x0A')
+            || ch == _CharT('\x0D'));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -453,20 +453,20 @@ inline bool is_whitespace (CharT ch)
 /**
  * @return @c true if character is a decimal digit (0..9), otherwise @c false.
  */
-template <typename CharT>
-inline bool is_digit (CharT ch)
+template <typename _CharT>
+inline bool is_digit (_CharT ch)
 {
-    // return (ch >= CharT('0') && ch <= CharT('9'));
-    return (ch == CharT('0')
-            || ch == CharT('1')
-            || ch == CharT('2')
-            || ch == CharT('3')
-            || ch == CharT('4')
-            || ch == CharT('5')
-            || ch == CharT('6')
-            || ch == CharT('7')
-            || ch == CharT('8')
-            || ch == CharT('9'));
+    // return (ch >= _CharT('0') && ch <= _CharT('9'));
+    return (ch == _CharT('0')
+            || ch == _CharT('1')
+            || ch == _CharT('2')
+            || ch == _CharT('3')
+            || ch == _CharT('4')
+            || ch == _CharT('5')
+            || ch == _CharT('6')
+            || ch == _CharT('7')
+            || ch == _CharT('8')
+            || ch == _CharT('9'));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -475,25 +475,25 @@ inline bool is_digit (CharT ch)
 /**
  * @return @c true if character is a hexadecimal digit (0..9A..Fa..f).
  */
-template <typename CharT>
-inline bool is_hexdigit (CharT ch)
+template <typename _CharT>
+inline bool is_hexdigit (_CharT ch)
 {
 //     return is_digit(ch)
-//             || (ch >= CharT('A') && ch <= CharT('F'))
-//             || (ch >= CharT('a') && ch <= CharT('f'));
+//             || (ch >= _CharT('A') && ch <= _CharT('F'))
+//             || (ch >= _CharT('a') && ch <= _CharT('f'));
     return (is_digit(ch)
-            || ch == CharT('a')
-            || ch == CharT('b')
-            || ch == CharT('c')
-            || ch == CharT('d')
-            || ch == CharT('e')
-            || ch == CharT('f')
-            || ch == CharT('A')
-            || ch == CharT('B')
-            || ch == CharT('C')
-            || ch == CharT('D')
-            || ch == CharT('E')
-            || ch == CharT('F'));
+            || ch == _CharT('a')
+            || ch == _CharT('b')
+            || ch == _CharT('c')
+            || ch == _CharT('d')
+            || ch == _CharT('e')
+            || ch == _CharT('f')
+            || ch == _CharT('A')
+            || ch == _CharT('B')
+            || ch == _CharT('C')
+            || ch == _CharT('D')
+            || ch == _CharT('E')
+            || ch == _CharT('F'));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -504,8 +504,8 @@ inline bool is_hexdigit (CharT ch)
  *      or -1 if conversion is impossible. @a radix must be between 2 and 36
  *      inclusive.
  */
-template <typename CharT>
-int to_digit (CharT ch, int radix = 10)
+template <typename _CharT>
+int to_digit (_CharT ch, int radix = 10)
 {
     int digit = 0;
 
@@ -531,8 +531,8 @@ int to_digit (CharT ch, int radix = 10)
 ////////////////////////////////////////////////////////////////////////////////
 // is_quotation_mark
 ////////////////////////////////////////////////////////////////////////////////
-template <typename CharT>
-inline bool is_quotation_mark (CharT ch, parse_policy_set const & parse_policy)
+template <typename _CharT>
+inline bool is_quotation_mark (_CharT ch, parse_policy_set const & parse_policy)
 {
     return (ch == '"'
             || (parse_policy.test(allow_single_quote_mark) && ch == '\''));
@@ -548,11 +548,11 @@ inline bool is_quotation_mark (CharT ch, parse_policy_set const & parse_policy)
  * @param last End of sequence position.
  * @return @c true if advanced by at least one position, otherwise @c false.
  */
-template <typename ForwardIterator>
-bool advance_whitespaces (ForwardIterator & pos
-        , ForwardIterator last)
+template <typename _ForwardIterator>
+bool advance_whitespaces (_ForwardIterator & pos
+        , _ForwardIterator last)
 {
-    ForwardIterator p = pos;
+    auto p = pos;
 
     while (p != last && is_whitespace(*p))
         ++p;
@@ -571,11 +571,11 @@ bool advance_whitespaces (ForwardIterator & pos
  * @return @c true if advanced by all character sequence [first2, last2),
  *      otherwise returns @c false.
  */
-template <typename ForwardIterator1, typename ForwardIterator2>
-inline bool advance_sequence (ForwardIterator1 & pos, ForwardIterator1 last
-        , ForwardIterator2 first2, ForwardIterator2 last2)
+template <typename _ForwardIterator1, typename _ForwardIterator2>
+inline bool advance_sequence (_ForwardIterator1 & pos, _ForwardIterator1 last
+        , _ForwardIterator2 first2, _ForwardIterator2 last2)
 {
-    ForwardIterator1 p = pos;
+    auto p = pos;
 
     while (p != last && first2 != last2 && *p++ == *first2++)
         ;
@@ -600,8 +600,8 @@ inline bool advance_sequence (ForwardIterator1 & pos, ForwardIterator1 last
  * @note Grammar
  * null  = %x6e.75.6c.6c      ; null
  */
-template <typename ForwardIterator>
-inline bool advance_null (ForwardIterator & pos, ForwardIterator last)
+template <typename _ForwardIterator>
+inline bool advance_null (_ForwardIterator & pos, _ForwardIterator last)
 {
     std::string s{"null"};
     return advance_sequence(pos, last, s.begin(), s.end());
@@ -619,8 +619,8 @@ inline bool advance_null (ForwardIterator & pos, ForwardIterator last)
  * @note Grammar
  * true  = %x74.72.75.65      ; true
  */
-template <typename ForwardIterator>
-inline bool advance_true (ForwardIterator & pos, ForwardIterator last)
+template <typename _ForwardIterator>
+inline bool advance_true (_ForwardIterator & pos, _ForwardIterator last)
 {
     std::string s{"true"};
     return advance_sequence(pos, last, s.begin(), s.end());
@@ -638,8 +638,8 @@ inline bool advance_true (ForwardIterator & pos, ForwardIterator last)
  * @note Grammar
  * true  = %x74.72.75.65      ; true
  */
-template <typename ForwardIterator>
-inline bool advance_false (ForwardIterator & pos, ForwardIterator last)
+template <typename _ForwardIterator>
+inline bool advance_false (_ForwardIterator & pos, _ForwardIterator last)
 {
     std::string s{"false"};
     return advance_sequence(pos, last, s.begin(), s.end());
@@ -652,13 +652,13 @@ inline bool advance_false (ForwardIterator & pos, ForwardIterator last)
  * @note Grammar:
  * encoded_char = 4HEXDIG
  */
-template <typename ForwardIterator>
-bool advance_encoded_char (ForwardIterator & pos, ForwardIterator last
+template <typename _ForwardIterator>
+bool advance_encoded_char (_ForwardIterator & pos, _ForwardIterator last
         , int32_t & result)
 {
     static constexpr int32_t multipliers[] = { 16 * 16 * 16, 16 * 16, 16, 1 };
     static constexpr int count = sizeof(multipliers) / sizeof(multipliers[0]);
-    ForwardIterator p = pos;
+    auto p = pos;
     int index = 0;
 
     result = 0;
@@ -704,15 +704,15 @@ bool advance_encoded_char (ForwardIterator & pos, ForwardIterator last
  *      / %x27                 ; '  JSON5 specific
  *  unescaped = %x20-21 / %x23-5B / %x5D-10FFFF
  */
-template <typename ForwardIterator, typename OutputIterator>
-inline bool advance_string (ForwardIterator & pos, ForwardIterator last
+template <typename _ForwardIterator, typename _OutputIterator>
+inline bool advance_string (_ForwardIterator & pos, _ForwardIterator last
         , parse_policy_set const & parse_policy
-        , OutputIterator output
+        , _OutputIterator output
         , error_code & ec)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
 
-    ForwardIterator p = pos;
+    auto p = pos;
 
     if (p == last)
         return false;
@@ -836,18 +836,18 @@ inline bool advance_string (ForwardIterator & pos, ForwardIterator last
  * plus = %x2B                ; +
  * zero = %x30                ; 0
  *
- * @note @a NumberType traits:
- *      NumberType & operator = (intmax_t)
- *      NumberType & operator = (uintmax_t)
- *      NumberType & operator = (double)
+ * @note @a _NumberType traits:
+ *      _NumberType & operator = (intmax_t)
+ *      _NumberType & operator = (uintmax_t)
+ *      _NumberType & operator = (double)
  */
-template <typename ForwardIterator, typename NumberPtr>
-bool advance_number (ForwardIterator & pos, ForwardIterator last
+template <typename _ForwardIterator, typename NumberPtr>
+bool advance_number (_ForwardIterator & pos, _ForwardIterator last
         , parse_policy_set const & parse_policy
         , NumberPtr pnum
         , error_code & /*ec*/)
 {
-    ForwardIterator p = pos;
+    auto p = pos;
     std::string numstr;
     int sign = 1;
     bool is_integer = true;
@@ -869,7 +869,7 @@ bool advance_number (ForwardIterator & pos, ForwardIterator last
         }
     }
 
-    ForwardIterator last_pos = p;
+    auto last_pos = p;
 
     ////////////////////////////////////////////////////////////////////////////
     // Advance integral part
@@ -998,8 +998,8 @@ bool advance_number (ForwardIterator & pos, ForwardIterator last
 ////////////////////////////////////////////////////////////////////////////////
 // Forward declaration for advance_value
 ////////////////////////////////////////////////////////////////////////////////
-template <typename ForwardIterator, typename CallbacksType>
-bool advance_value (ForwardIterator & pos, ForwardIterator last
+template <typename _ForwardIterator, typename CallbacksType>
+bool advance_value (_ForwardIterator & pos, _ForwardIterator last
         , parse_policy_set const & parse_policy
         , CallbacksType callbacks);
 
@@ -1014,11 +1014,11 @@ bool advance_value (ForwardIterator & pos, ForwardIterator last
  *  name-separator  = ws %x3A ws  ; : colon
  *  value-separator = ws %x2C ws  ; , comma
  */
-template <typename ForwardIterator>
-bool advance_delimiter_char (ForwardIterator & pos, ForwardIterator last
+template <typename _ForwardIterator>
+bool advance_delimiter_char (_ForwardIterator & pos, _ForwardIterator last
         , typename std::remove_reference<decltype(*pos)>::type delim)
 {
-    ForwardIterator p = pos;
+    auto p = pos;
 
     advance_whitespaces(p, last);
 
@@ -1034,43 +1034,43 @@ bool advance_delimiter_char (ForwardIterator & pos, ForwardIterator last
     return compare_and_assign(pos, p);
 }
 
-template <typename ForwardIterator>
-inline bool advance_begin_array (ForwardIterator & pos, ForwardIterator last)
+template <typename _ForwardIterator>
+inline bool advance_begin_array (_ForwardIterator & pos, _ForwardIterator last)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
     return advance_delimiter_char(pos, last, char_type{'['});
 }
 
-template <typename ForwardIterator>
-inline bool advance_begin_object (ForwardIterator & pos, ForwardIterator last)
+template <typename _ForwardIterator>
+inline bool advance_begin_object (_ForwardIterator & pos, _ForwardIterator last)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
     return advance_delimiter_char(pos, last, char_type{'{'});
 }
 
-template <typename ForwardIterator>
-inline bool advance_end_array (ForwardIterator & pos, ForwardIterator last)
+template <typename _ForwardIterator>
+inline bool advance_end_array (_ForwardIterator & pos, _ForwardIterator last)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
     return advance_delimiter_char(pos, last, char_type{']'});
 }
 
-template <typename ForwardIterator>
-inline bool advance_end_object (ForwardIterator & pos, ForwardIterator last)
+template <typename _ForwardIterator>
+inline bool advance_end_object (_ForwardIterator & pos, _ForwardIterator last)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
     return advance_delimiter_char(pos, last, char_type{'}'});
 }
 
-template <typename ForwardIterator>
-inline bool advance_name_separator (ForwardIterator & pos, ForwardIterator last)
+template <typename _ForwardIterator>
+inline bool advance_name_separator (_ForwardIterator & pos, _ForwardIterator last)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
     return advance_delimiter_char(pos, last, char_type{':'});
 }
 
-template <typename ForwardIterator>
-inline bool advance_value_separator (ForwardIterator & pos, ForwardIterator last)
+template <typename _ForwardIterator>
+inline bool advance_value_separator (_ForwardIterator & pos, _ForwardIterator last)
 {
     using char_type = typename std::remove_reference<decltype(*pos)>::type;
     return advance_delimiter_char(pos, last, char_type{','});
@@ -1088,12 +1088,12 @@ inline bool advance_value_separator (ForwardIterator & pos, ForwardIterator last
  * value-separator = ws %x2C ws  ; , comma
  * value = false / null / true / object / array / number / string
  */
-template <typename ForwardIterator, typename CallbacksType>
-bool advance_array (ForwardIterator & pos, ForwardIterator last
+template <typename _ForwardIterator, typename CallbacksType>
+bool advance_array (_ForwardIterator & pos, _ForwardIterator last
         , parse_policy_set const & parse_policy
         , CallbacksType callbacks)
 {
-    ForwardIterator p = pos;
+    auto p = pos;
 
     if (!advance_begin_array(p, last))
         return false;
@@ -1136,12 +1136,12 @@ inline auto size (C const & c) -> decltype(c.size())
  * name-separator  = ws %x3A ws  ; : colon
  * value = false / null / true / object / array / number / string
  */
-template <typename ForwardIterator, typename CallbacksType>
-bool advance_member (ForwardIterator & pos, ForwardIterator last
+template <typename _ForwardIterator, typename CallbacksType>
+bool advance_member (_ForwardIterator & pos, _ForwardIterator last
         , parse_policy_set const & parse_policy
         , CallbacksType callbacks)
 {
-    ForwardIterator p = pos;
+    auto p = pos;
 
     typename CallbacksType::string_type name;
     error_code ec;
@@ -1178,7 +1178,7 @@ bool advance_member (ForwardIterator & pos, ForwardIterator last
 // advance_object
 ////////////////////////////////////////////////////////////////////////////////
 /**
- * @details ObjectType traits:
+ * @details _ObjectType traits:
  *  - provides @code key_type @endcode typename
  *  - provides @code mapped_type @endcode typename
  *  - provides @code emplace(std::pair<key_type, mapped_type> &&) @endcode method
@@ -1192,12 +1192,12 @@ bool advance_member (ForwardIterator & pos, ForwardIterator last
  * value-separator = ws %x2C ws  ; , comma
  * value = false / null / true / object / array / number / string
  */
-template <typename ForwardIterator, typename CallbacksType>
-bool advance_object (ForwardIterator & pos, ForwardIterator last
+template <typename _ForwardIterator, typename CallbacksType>
+bool advance_object (_ForwardIterator & pos, _ForwardIterator last
         , parse_policy_set const & parse_policy
         , CallbacksType callbacks)
 {
-    ForwardIterator p = pos;
+    auto p = pos;
 
     if (!advance_begin_object(p, last))
         return false;
@@ -1229,12 +1229,12 @@ bool advance_object (ForwardIterator & pos, ForwardIterator last
 //
 // Specialization: no, for values of any type
 ////////////////////////////////////////////////////////////////////////////////
-template <typename ForwardIterator, typename CallbacksType>
-bool advance_value (ForwardIterator & pos, ForwardIterator last
+template <typename _ForwardIterator, typename CallbacksType>
+bool advance_value (_ForwardIterator & pos, _ForwardIterator last
         , parse_policy_set const & parse_policy
         , CallbacksType callbacks)
 {
-    ForwardIterator p = pos;
+    auto p = pos;
 
     // Skip head witespaces
     advance_whitespaces(p, last);
@@ -1304,14 +1304,14 @@ bool advance_value (ForwardIterator & pos, ForwardIterator last
 ////////////////////////////////////////////////////////////////////////////////
 // advance_json
 ////////////////////////////////////////////////////////////////////////////////
-template <typename ForwardIterator, typename CallbacksType>
-bool advance_json (ForwardIterator & pos, ForwardIterator last
+template <typename _ForwardIterator, typename CallbacksType>
+bool advance_json (_ForwardIterator & pos, _ForwardIterator last
         , parse_policy_set const & parse_policy
         , CallbacksType callbacks)
 {
     // Doublicated advance_value
 
-    ForwardIterator p = pos;
+    auto p = pos;
 
     // Skip head witespaces
     advance_whitespaces(p, last);
@@ -1405,13 +1405,13 @@ bool advance_json (ForwardIterator & pos, ForwardIterator last
 ////////////////////////////////////////////////////////////////////////////////
 //
 ////////////////////////////////////////////////////////////////////////////////
-template <typename ForwardIterator, typename CallbacksType>
-inline ForwardIterator parse (ForwardIterator first
-        , ForwardIterator last
+template <typename _ForwardIterator, typename CallbacksType>
+inline _ForwardIterator parse (_ForwardIterator first
+        , _ForwardIterator last
         , parse_policy_set const & parse_policy
         , CallbacksType callbacks)
 {
-    ForwardIterator pos = first;
+    auto pos = first;
 
     if (advance_json(pos, last, parse_policy, callbacks))
         return pos;
@@ -1422,9 +1422,9 @@ inline ForwardIterator parse (ForwardIterator first
 /**
  *
  */
-template <typename ForwardIterator, typename CallbacksType>
-inline ForwardIterator parse (ForwardIterator first
-        , ForwardIterator last
+template <typename _ForwardIterator, typename CallbacksType>
+inline _ForwardIterator parse (_ForwardIterator first
+        , _ForwardIterator last
         , CallbacksType callbacks)
 {
     return parse(first, last, default_policy(), callbacks);
@@ -1433,10 +1433,10 @@ inline ForwardIterator parse (ForwardIterator first
 ////////////////////////////////////////////////////////////////////////////////
 // parse_array
 ////////////////////////////////////////////////////////////////////////////////
-template <typename ForwardIterator, typename ArrayType>
-typename std::enable_if<std::is_arithmetic<typename ArrayType::value_type>::value, ForwardIterator>::type
-parse_array (ForwardIterator first
-        , ForwardIterator last
+template <typename _ForwardIterator, typename ArrayType>
+typename std::enable_if<std::is_arithmetic<typename ArrayType::value_type>::value, _ForwardIterator>::type
+parse_array (_ForwardIterator first
+        , _ForwardIterator last
         , parse_policy_set const & parse_policy
         , ArrayType & arr
         , error_code & ec)
@@ -1451,16 +1451,16 @@ parse_array (ForwardIterator first
     return parse(first, last, parse_policy, callbacks);
 }
 
-template <typename StringType>
+template <typename _StringType>
 struct is_string;
 
 template <>
 struct is_string<std::string> : std::integral_constant<bool, true> {};
 
-template <typename ForwardIterator, typename ArrayType>
-typename std::enable_if<is_string<typename ArrayType::value_type>::value, ForwardIterator>::type
-parse_array (ForwardIterator first
-        , ForwardIterator last
+template <typename _ForwardIterator, typename ArrayType>
+typename std::enable_if<is_string<typename ArrayType::value_type>::value, _ForwardIterator>::type
+parse_array (_ForwardIterator first
+        , _ForwardIterator last
         , parse_policy_set const & parse_policy
         , ArrayType & arr
         , error_code & ec)
@@ -1475,18 +1475,18 @@ parse_array (ForwardIterator first
     return parse(first, last, parse_policy, callbacks);
 }
 
-template <typename ForwardIterator, typename ArrayType>
-inline ForwardIterator parse_array (ForwardIterator first
-        , ForwardIterator last
+template <typename _ForwardIterator, typename ArrayType>
+inline _ForwardIterator parse_array (_ForwardIterator first
+        , _ForwardIterator last
         , ArrayType & arr
         , error_code & ec)
 {
     return parse_array(first, last, default_policy(), arr, ec);
 }
 
-template <typename ForwardIterator, typename ArrayType>
-inline ForwardIterator parse_array (ForwardIterator first
-        , ForwardIterator last
+template <typename _ForwardIterator, typename ArrayType>
+inline _ForwardIterator parse_array (_ForwardIterator first
+        , _ForwardIterator last
         , ArrayType & arr)
 {
     error_code ec;
@@ -1499,17 +1499,17 @@ inline ForwardIterator parse_array (ForwardIterator first
 ////////////////////////////////////////////////////////////////////////////////
 // parse_object
 ////////////////////////////////////////////////////////////////////////////////
-template <typename ForwardIterator, typename ObjectType>
-typename std::enable_if<is_string<typename ObjectType::key_type>::value
-        && std::is_arithmetic<typename ObjectType::mapped_type>::value, ForwardIterator>::type
-parse_object (ForwardIterator first
-        , ForwardIterator last
+template <typename _ForwardIterator, typename _ObjectType>
+typename std::enable_if<is_string<typename _ObjectType::key_type>::value
+        && std::is_arithmetic<typename _ObjectType::mapped_type>::value, _ForwardIterator>::type
+parse_object (_ForwardIterator first
+        , _ForwardIterator last
         , parse_policy_set const & parse_policy
-        , ObjectType & obj
+        , _ObjectType & obj
         , error_code & ec)
 {
-    using value_type = typename ObjectType::mapped_type;
-    using string_type = typename ObjectType::key_type;
+    using value_type = typename _ObjectType::mapped_type;
+    using string_type = typename _ObjectType::key_type;
 
     basic_callbacks<string_type, value_type> callbacks;
     string_type member_name;
@@ -1522,17 +1522,17 @@ parse_object (ForwardIterator first
     return parse(first, last, parse_policy, callbacks);
 }
 
-template <typename ForwardIterator, typename ObjectType>
-typename std::enable_if<is_string<typename ObjectType::key_type>::value
-        && is_string<typename ObjectType::mapped_type>::value, ForwardIterator>::type
-parse_object (ForwardIterator first
-        , ForwardIterator last
+template <typename _ForwardIterator, typename _ObjectType>
+typename std::enable_if<is_string<typename _ObjectType::key_type>::value
+        && is_string<typename _ObjectType::mapped_type>::value, _ForwardIterator>::type
+parse_object (_ForwardIterator first
+        , _ForwardIterator last
         , parse_policy_set const & parse_policy
-        , ObjectType & obj
+        , _ObjectType & obj
         , error_code & ec)
 {
-    using value_type = typename ObjectType::mapped_type;
-    using string_type = typename ObjectType::key_type;
+    using value_type = typename _ObjectType::mapped_type;
+    using string_type = typename _ObjectType::key_type;
 
     basic_callbacks<string_type, value_type> callbacks;
     string_type member_name;
@@ -1545,19 +1545,19 @@ parse_object (ForwardIterator first
     return parse(first, last, parse_policy, callbacks);
 }
 
-template <typename ForwardIterator, typename ObjectType>
-inline ForwardIterator parse_object (ForwardIterator first
-        , ForwardIterator last
-        , ObjectType & obj
+template <typename _ForwardIterator, typename _ObjectType>
+inline _ForwardIterator parse_object (_ForwardIterator first
+        , _ForwardIterator last
+        , _ObjectType & obj
         , error_code & ec)
 {
     return parse_object(first, last, default_policy(), obj, ec);
 }
 
-template <typename ForwardIterator, typename ObjectType>
-inline ForwardIterator parse_object (ForwardIterator first
-        , ForwardIterator last
-        , ObjectType & obj)
+template <typename _ForwardIterator, typename _ObjectType>
+inline _ForwardIterator parse_object (_ForwardIterator first
+        , _ForwardIterator last
+        , _ObjectType & obj)
 {
     error_code ec;
     auto pos = parse_object(first, last, obj, ec);

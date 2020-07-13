@@ -6,6 +6,7 @@
 2. [JSON for Modern C++ - nlohmann](https://github.com/nlohmann/json)
 3. [RapidJSON](https://github.com/Tencent/rapidjson)
 4. [JSONCONS](https://github.com/danielaparker/jsoncons)
+5. [(Not-Yet-In-Boost).JSON](https://github.com/CPPAlliance/json)
 
 ### Floating point parsing
 

@@ -31,7 +31,7 @@ class basic_iterator : public iterator_facade<bidirectional_iterator_tag
 
     enum { scalar_iterator_index, array_iterator_index, object_iterator_index };
 
-    using mixed_iterator = variant<
+    using mixed_iterator = std::variant<
               scalar_iterator
             , array_iterator
             , object_iterator>;
@@ -49,7 +49,7 @@ protected:
     basic_iterator (pointer p) noexcept
         : _index(scalar_iterator_index)
     {
-        auto & native_it = pfs::get<scalar_iterator_index>(_mit);
+        auto & native_it = std::get<scalar_iterator_index>(_mit);
         native_it = p;
     }
 
@@ -59,7 +59,7 @@ protected:
     basic_iterator (array_iterator it) noexcept
         : _index(array_iterator_index)
     {
-        auto & native_it = pfs::get<array_iterator_index>(_mit);
+        auto & native_it = std::get<array_iterator_index>(_mit);
         native_it = it;
     }
 
@@ -69,7 +69,7 @@ protected:
     basic_iterator (object_iterator it) noexcept
         : _index(object_iterator_index)
     {
-        auto & native_it = pfs::get<object_iterator_index>(_mit);
+        auto & native_it = std::get<object_iterator_index>(_mit);
         native_it = it;
     }
 
@@ -77,14 +77,14 @@ protected:
     {
         switch (_index) {
             case array_iterator_index:
-                return *pfs::get<array_iterator_index>(_mit);
+                return *std::get<array_iterator_index>(_mit);
             case object_iterator_index:
-                return pfs::get<object_iterator_index>(_mit)->second;
+                return std::get<object_iterator_index>(_mit)->second;
             default:
                 break;
         }
 
-        return *pfs::get<scalar_iterator_index>(_mit);
+        return *std::get<scalar_iterator_index>(_mit);
     }
 
     const pointer ptr () const
@@ -101,14 +101,14 @@ public:
     {
         switch (_index) {
             case array_iterator_index:
-                return *pfs::get<array_iterator_index>(_mit);
+                return *std::get<array_iterator_index>(_mit);
             case object_iterator_index:
-                return pfs::get<object_iterator_index>(_mit)->second;
+                return std::get<object_iterator_index>(_mit)->second;
             default:
                 break;
         }
 
-        return *pfs::get<scalar_iterator_index>(_mit);
+        return *std::get<scalar_iterator_index>(_mit);
     }
 
     pointer ptr ()
@@ -121,13 +121,13 @@ public:
     {
         switch (_index) {
             case scalar_iterator_index:
-                ++pfs::get<scalar_iterator_index>(_mit);
+                ++std::get<scalar_iterator_index>(_mit);
                 break;
             case array_iterator_index:
-                ++pfs::get<array_iterator_index>(_mit);
+                ++std::get<array_iterator_index>(_mit);
                 break;
             case object_iterator_index:
-                ++pfs::get<object_iterator_index>(_mit);
+                ++std::get<object_iterator_index>(_mit);
                 break;
         }
     }
@@ -136,13 +136,13 @@ public:
     {
         switch (_index) {
             case scalar_iterator_index:
-                --pfs::get<scalar_iterator_index>(_mit);
+                --std::get<scalar_iterator_index>(_mit);
                 break;
             case array_iterator_index:
-                --pfs::get<array_iterator_index>(_mit);
+                --std::get<array_iterator_index>(_mit);
                 break;
             case object_iterator_index:
-                --pfs::get<object_iterator_index>(_mit);
+                --std::get<object_iterator_index>(_mit);
                 break;
         }
     }

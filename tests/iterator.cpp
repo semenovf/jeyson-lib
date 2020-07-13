@@ -14,7 +14,7 @@ TEST_CASE("Iterators") {
                 , json_value{std::numeric_limits<int>::min()}
                 , json_value{"hello"} };
 
-        for (json_value & v: values) {
+        for (auto & v: values) {
             auto first = std::begin(v);
             auto last = std::end(v);
             CHECK(first != last);

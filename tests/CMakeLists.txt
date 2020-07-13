@@ -1,7 +1,9 @@
 project(pfs_json_TESTS)
 option(pfs_json_COVERAGE "Build tests with coverage support" OFF)
 
-include_directories(${CMAKE_SOURCE_DIR}/pfs-common/include)
+if (NOT TARGET pfs::json)
+    message(FATAL_ERROR "No target `pfs::json` found")
+endif()
 
 if (pfs_json_COVERAGE)
     message(STATUS "Coverage feature enabled")
@@ -16,14 +18,19 @@ endif()
 # Copy test files to build folder
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION .)
 
-add_executable(json json.cpp)
-add_test(NAME json COMMAND json)
+set(TEST_NAMES
+    json
+    iterator
+    parser
+    file_parser)
 
-add_executable(iterator iterator.cpp)
-add_test(NAME iterator COMMAND iterator)
+foreach (name ${TEST_NAMES})
+    if (${name}_SOURCES)
+        add_executable(${name} ${name}.cpp ${${name}_SOURCES})
+    else ()
+        add_executable(${name} ${name}.cpp)
+    endif()
 
-add_executable(parser parser.cpp)
-add_test(NAME parser COMMAND parser)
-
-add_executable(file_parser file_parser.cpp)
-add_test(NAME file_parser COMMAND file_parser)
+    target_link_libraries(${name} PRIVATE pfs::json)
+    add_test(NAME ${name} COMMAND ${name})
+endforeach()
