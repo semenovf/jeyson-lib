@@ -1,10 +1,19 @@
+////////////////////////////////////////////////////////////////////////////////
+// Copyright (c) 2019-2022 Vladislav Trifochkin
+//
+// This file is part of `jeyson-lib`.
+//
+// Changelog:
+//      2019.12.11 Initial version (pfs-json).
+//      2022.02.07 Initial version (jeyson-lib).
+////////////////////////////////////////////////////////////////////////////////
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "doctest.h"
-#include "pfs/json/parser.hpp"
+#include "../doctest.h"
+#include "pfs/jeyson/v1/parser.hpp"
 #include <string>
 
 TEST_CASE("is_whitespace") {
-    using pfs::json::is_whitespace;
+    using jeyson::v1::is_whitespace;
 
     CHECK(is_whitespace(' '));
     CHECK(is_whitespace('\t'));
@@ -14,7 +23,7 @@ TEST_CASE("is_whitespace") {
 }
 
 TEST_CASE("is_digit") {
-    using pfs::json::is_digit;
+    using jeyson::v1::is_digit;
 
     CHECK(is_digit('0'));
     CHECK(is_digit('1'));
@@ -30,7 +39,7 @@ TEST_CASE("is_digit") {
 }
 
 TEST_CASE("is_hexdigit") {
-    using pfs::json::is_hexdigit;
+    using jeyson::v1::is_hexdigit;
 
     CHECK(is_hexdigit('0'));
     CHECK(is_hexdigit('1'));
@@ -59,7 +68,7 @@ TEST_CASE("is_hexdigit") {
 }
 
 TEST_CASE("to_digit") {
-    using pfs::json::to_digit;
+    using jeyson::v1::to_digit;
 
     CHECK(to_digit('0') == 0);
     CHECK(to_digit('1') == 1);
@@ -84,8 +93,8 @@ struct test_advance_data
 {
     std::string s; // char sequence
     bool r;        // result
-    pfs::json::parse_policy_set parse_policy = pfs::json::strict_policy();
-    pfs::json::error_code ec;
+    jeyson::v1::parse_policy_set parse_policy = jeyson::v1::strict_policy();
+    std::error_code ec;
 
     test_advance_data(std::string const & a
             , bool b)
@@ -94,20 +103,20 @@ struct test_advance_data
 
     test_advance_data(std::string const & a
             , bool b
-            , pfs::json::parse_policy_set const & c)
+            , jeyson::v1::parse_policy_set const & c)
         : s(a), r(b), parse_policy(c)
     {}
 
     test_advance_data(std::string const & a
             , bool b
-            , pfs::json::parse_policy_set const & c
-            , pfs::json::errc d)
-        : s(a), r(b), parse_policy(c), ec(pfs::json::make_error_code(d))
+            , jeyson::v1::parse_policy_set const & c
+            , jeyson::errc d)
+        : s(a), r(b), parse_policy(c), ec(jeyson::make_error_code(d))
     {}
 };
 
 TEST_CASE("advance_null") {
-    using pfs::json::advance_null;
+    using jeyson::v1::advance_null;
 
     test_advance_data data[] = {
           { "n", false }
@@ -128,7 +137,7 @@ TEST_CASE("advance_null") {
 }
 
 TEST_CASE("advance_true") {
-    using pfs::json::advance_true;
+    using jeyson::v1::advance_true;
 
     test_advance_data data[] = {
           { "t", false }
@@ -149,7 +158,7 @@ TEST_CASE("advance_true") {
 }
 
 TEST_CASE("advance_false") {
-    using pfs::json::advance_false;
+    using jeyson::v1::advance_false;
 
     test_advance_data data[] = {
           { "f", false }
@@ -171,7 +180,7 @@ TEST_CASE("advance_false") {
 }
 
 TEST_CASE("advance_encoded_char") {
-    using pfs::json::advance_encoded_char;
+    using jeyson::v1::advance_encoded_char;
 
     test_advance_data data[] = {
           { "a", false }
@@ -193,17 +202,17 @@ TEST_CASE("advance_encoded_char") {
 }
 
 TEST_CASE("advance_string") {
-    using pfs::json::advance_string;
+    using jeyson::v1::advance_string;
 
     test_advance_data data[] = {
-          { "\"\"", true, pfs::json::strict_policy() }
-        , { "''", true, pfs::json::json5_policy() }
+          { "\"\"", true, jeyson::v1::strict_policy() }
+        , { "''", true, jeyson::v1::json5_policy() }
         , { "\"simple string\"", true }
 
         , { "\"unquoted string"
-                , false
-                , pfs::json::strict_policy()
-                , pfs::json::errc::unbalanced_quote }
+            , false
+            , jeyson::v1::strict_policy()
+            , jeyson::errc::unbalanced_quote }
 
         , { "\"good escaped\\\" char\"", true }
         , { "\"good escaped\\\\ char\"", true }
@@ -213,36 +222,36 @@ TEST_CASE("advance_string") {
         , { "\"good escaped\\n char\"", true }
         , { "\"good escaped\\r char\"", true }
         , { "\"good escaped\\t char\"", true }
-        , { "\"good escaped\\X char\"", true, pfs::json::relaxed_policy() }
+        , { "\"good escaped\\X char\"", true, jeyson::v1::relaxed_policy() }
 
         , { "\"bad escaped \\char\""
-                , false
-                , pfs::json::strict_policy()
-                , pfs::json::errc::bad_escaped_char }
+            , false
+            , jeyson::v1::strict_policy()
+            , jeyson::errc::bad_escaped_char }
 
         // Use encoded chars from ASCII table as output iterator will use
         // std::string::iterator to avoid 'SIGSEGV - Segmentation violation signal' (GCC)
         , { "\"good encoded \\u0020 char\"" , true }
 
         , { "\"bad encoded \\u0 char\""
-                , false
-                , pfs::json::strict_policy()
-                , pfs::json::errc::bad_encoded_char }
+            , false
+            , jeyson::v1::strict_policy()
+            , jeyson::errc::bad_encoded_char }
     };
 
     for (int i = 0, count = sizeof(data) / sizeof(data[0])
             ; i < count; i++) {
         auto pos  = data[i].s.begin();
         auto last = data[i].s.end();
-        pfs::json::error_code ec;
+        std::error_code ec;
 
         std::string s;
 
         CHECK(advance_string(pos
-                , last
-                , data[i].parse_policy
-                , std::back_inserter(s)
-                , ec) == data[i].r);
+            , last
+            , data[i].parse_policy
+            , std::back_inserter(s)
+            , ec) == data[i].r);
         CHECK(ec == data[i].ec);
     }
 }
@@ -321,7 +330,7 @@ struct test_advance_number : test_advance_data
     test_advance_number(T const & n
             , std::string const & a
             , bool b
-            , pfs::json::parse_policy_set const & c)
+            , jeyson::v1::parse_policy_set const & c)
         : test_advance_data(a, b, c)
         , num(n)
     {}
@@ -329,8 +338,8 @@ struct test_advance_number : test_advance_data
     test_advance_number(T const & n
             , std::string const & a
             , bool b
-            , pfs::json::parse_policy_set const & c
-            , pfs::json::errc d)
+            , jeyson::v1::parse_policy_set const & c
+            , jeyson::errc d)
         : test_advance_data(a, b, c, d)
         , num(n)
     {}
@@ -338,8 +347,8 @@ struct test_advance_number : test_advance_data
 
 TEST_CASE("advance_number for integers") {
     using integer_type = int;
-    using pfs::json::advance_number;
-    using pfs::json::relaxed_policy;
+    using jeyson::v1::advance_number;
+    using jeyson::v1::relaxed_policy;
 
     integer_type max_integer = std::numeric_limits<integer_type>::max();
     integer_type min_integer = std::numeric_limits<integer_type>::min();
@@ -362,7 +371,7 @@ TEST_CASE("advance_number for integers") {
             ; i < count; i++) {
         auto pos  = data[i].s.begin();
         auto last = data[i].s.end();
-        pfs::json::error_code ec;
+        std::error_code ec;
 
         integer_type num;
         auto ok = advance_number(pos, last, data[i].parse_policy, & num, ec);
@@ -375,8 +384,8 @@ TEST_CASE("advance_number for integers") {
 }
 
 TEST_CASE("advance_number for custom number type") {
-    using pfs::json::advance_number;
-    using pfs::json::relaxed_policy;
+    using jeyson::v1::advance_number;
+    using jeyson::v1::relaxed_policy;
 
     test_advance_number<Number> data[] = {
           { Number{intmax_t(0)}, "0", true }
@@ -390,7 +399,7 @@ TEST_CASE("advance_number for custom number type") {
             ; i < count; i++) {
         auto pos  = data[i].s.begin();
         auto last = data[i].s.end();
-        pfs::json::error_code ec;
+        std::error_code ec;
 
         Number num;
         auto ok = advance_number(pos, last, data[i].parse_policy, & num, ec);
@@ -403,17 +412,17 @@ TEST_CASE("advance_number for custom number type") {
 }
 
 TEST_CASE("parse_array of booleans") {
-    using pfs::json::parse_array;
-    using pfs::json::strict_policy;
+    using jeyson::v1::parse_array;
+    using jeyson::v1::strict_policy;
 
     auto arr_str = std::string{"[true, true, false, true, false]"};
     std::vector<bool> arr;
-    pfs::json::error_code ec;
+    std::error_code ec;
 
     auto first = arr_str.begin();
     auto last = arr_str.end();
     auto pos = parse_array(first, last, strict_policy(), arr, ec);
-    REQUIRE(ec == pfs::json::error_code{});
+    REQUIRE(ec == std::error_code{});
     REQUIRE(pos == last);
     REQUIRE(arr.size() == 5);
     CHECK(arr[0] == true);
@@ -424,17 +433,17 @@ TEST_CASE("parse_array of booleans") {
 }
 
 TEST_CASE("parse_array of integers") {
-    using pfs::json::parse_array;
-    using pfs::json::strict_policy;
+    using jeyson::v1::parse_array;
+    using jeyson::v1::strict_policy;
 
     auto arr_str = std::string{"[1, 2, 3, 4, 5]"};
     std::vector<int> arr;
-    pfs::json::error_code ec;
+    std::error_code ec;
 
     auto first = arr_str.begin();
     auto last = arr_str.end();
     auto pos = parse_array(first, last, strict_policy(), arr, ec);
-    REQUIRE(ec == pfs::json::error_code{});
+    REQUIRE(ec == std::error_code{});
     REQUIRE(pos == last);
     REQUIRE(arr.size() == 5);
     CHECK(arr[0] == 1);
@@ -445,17 +454,17 @@ TEST_CASE("parse_array of integers") {
 }
 
 TEST_CASE("parse_array of floating points") {
-    using pfs::json::parse_array;
-    using pfs::json::strict_policy;
+    using jeyson::v1::parse_array;
+    using jeyson::v1::strict_policy;
 
     auto arr_str = std::string{"[0.1, 0.2, 0.3, 0.4, 0.5]"};
     std::vector<double> arr;
-    pfs::json::error_code ec;
+    std::error_code ec;
 
     auto first = arr_str.begin();
     auto last = arr_str.end();
     auto pos = parse_array(first, last, strict_policy(), arr, ec);
-    REQUIRE(ec == pfs::json::error_code{});
+    REQUIRE(ec == std::error_code{});
     REQUIRE(pos == last);
     REQUIRE(arr.size() == 5);
     CHECK(arr[0] == std::stod("0.1"));
@@ -466,17 +475,17 @@ TEST_CASE("parse_array of floating points") {
 }
 
 TEST_CASE("parse_array of strings") {
-    using pfs::json::parse_array;
-    using pfs::json::strict_policy;
+    using jeyson::v1::parse_array;
+    using jeyson::v1::strict_policy;
 
     auto arr_str = std::string{"[\"one\", \"two\", \"three\"]"};
     std::vector<std::string> arr;
-    pfs::json::error_code ec;
+    std::error_code ec;
 
     auto first = arr_str.begin();
     auto last = arr_str.end();
     auto pos = parse_array(first, last, strict_policy(), arr, ec);
-    REQUIRE(ec == pfs::json::error_code{});
+    REQUIRE(ec == std::error_code{});
     REQUIRE(pos == last);
     REQUIRE(arr.size() == 3);
     CHECK(arr[0] == "one");
@@ -485,17 +494,17 @@ TEST_CASE("parse_array of strings") {
 }
 
 TEST_CASE("parse_object of booleans") {
-    using pfs::json::parse_object;
-    using pfs::json::strict_policy;
+    using jeyson::v1::parse_object;
+    using jeyson::v1::strict_policy;
 
     auto obj_str = std::string{"{\"one\": true, \"two\": false, \"three\": true}"};
     std::map<std::string, bool> obj;
-    pfs::json::error_code ec;
+    std::error_code ec;
 
     auto first = obj_str.begin();
     auto last = obj_str.end();
     auto pos = parse_object(first, last, strict_policy(), obj, ec);
-    REQUIRE(ec == pfs::json::error_code{});
+    REQUIRE(ec == std::error_code{});
     REQUIRE(pos == last);
     REQUIRE(obj.size() == 3);
     CHECK(obj["one"] == true);
@@ -504,17 +513,17 @@ TEST_CASE("parse_object of booleans") {
 }
 
 TEST_CASE("parse_object of integers") {
-    using pfs::json::parse_object;
-    using pfs::json::strict_policy;
+    using jeyson::v1::parse_object;
+    using jeyson::v1::strict_policy;
 
     auto obj_str = std::string{"{\"one\": 1, \"two\": 2, \"three\": 3}"};
     std::map<std::string, int> obj;
-    pfs::json::error_code ec;
+    std::error_code ec;
 
     auto first = obj_str.begin();
     auto last = obj_str.end();
     auto pos = parse_object(first, last, strict_policy(), obj, ec);
-    REQUIRE(ec == pfs::json::error_code{});
+    REQUIRE(ec == std::error_code{});
     REQUIRE(pos == last);
     REQUIRE(obj.size() == 3);
     CHECK(obj["one"] == 1);
@@ -523,17 +532,17 @@ TEST_CASE("parse_object of integers") {
 }
 
 TEST_CASE("parse_object of floating point") {
-    using pfs::json::parse_object;
-    using pfs::json::strict_policy;
+    using jeyson::v1::parse_object;
+    using jeyson::v1::strict_policy;
 
     auto obj_str = std::string{"{\"one\": 0.1, \"two\": 0.2, \"three\": 0.3}"};
     std::map<std::string, double> obj;
-    pfs::json::error_code ec;
+    std::error_code ec;
 
     auto first = obj_str.begin();
     auto last = obj_str.end();
     auto pos = parse_object(first, last, strict_policy(), obj, ec);
-    REQUIRE(ec == pfs::json::error_code{});
+    REQUIRE(ec == std::error_code{});
     REQUIRE(pos == last);
     REQUIRE(obj.size() == 3);
     CHECK(obj["one"] == std::stod("0.1"));
@@ -542,17 +551,17 @@ TEST_CASE("parse_object of floating point") {
 }
 
 TEST_CASE("parse_object of strings") {
-    using pfs::json::parse_object;
-    using pfs::json::strict_policy;
+    using jeyson::v1::parse_object;
+    using jeyson::v1::strict_policy;
 
     auto obj_str = std::string{"{\"one\": \"one\", \"two\": \"two\", \"three\": \"three\"}"};
     std::map<std::string, std::string> obj;
-    pfs::json::error_code ec;
+    std::error_code ec;
 
     auto first = obj_str.begin();
     auto last = obj_str.end();
     auto pos = parse_object(first, last, strict_policy(), obj, ec);
-    REQUIRE(ec == pfs::json::error_code{});
+    REQUIRE(ec == std::error_code{});
     REQUIRE(pos == last);
     REQUIRE(obj.size() == 3);
     CHECK(obj["one"] == "one");

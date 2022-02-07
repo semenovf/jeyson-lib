@@ -1,21 +1,19 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Copyright (c) 2019 Vladislav Trifochkin
 //
-// This file is part of [pfs-json](https://github.com/semenovf/pfs-json) library.
+// This file is part of `jeyson-lib`.
 //
 // Changelog:
-//      2019.12.05 Initial version
+//      2019.12.05 Initial version (pfs-json).
+//      2022.02.07 Initial version (jeyson-lib).
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include <system_error>
+#include "pfs/error.hpp"
 
-namespace pfs {
-namespace json {
+namespace jeyson {
 
-////////////////////////////////////////////////////////////////////////////////
-// Error codes, category, exception class
-////////////////////////////////////////////////////////////////////////////////
-using error_code = std::error_code;
+#define JEYSON__ASSERT(condition, message) PFS__ASSERT(condition, message)
+#define JEYSON__THROW(x) PFS__THROW(x)
 
 enum class errc
 {
@@ -33,6 +31,7 @@ enum class errc
 
 //
     , type_error
+    , type_cast_error
     , null_pointer
 };
 
@@ -41,7 +40,7 @@ class error_category : public std::error_category
 public:
     virtual char const * name () const noexcept override
     {
-        return "json_category";
+        return "jeyson::error_category";
     }
 
     virtual std::string message (int ev) const override
@@ -69,6 +68,9 @@ public:
             case static_cast<int>(errc::type_error):
                 return std::string{"type error"};
 
+            case static_cast<int>(errc::type_cast_error):
+                return std::string{"type cast error"};
+
             case static_cast<int>(errc::null_pointer):
                 return std::string{"null pointer"};
 
@@ -88,17 +90,25 @@ inline std::error_code make_error_code (errc e)
     return std::error_code(static_cast<int>(e), get_error_category());
 }
 
-inline std::system_error make_exception (errc e)
+class error: public pfs::error
 {
-    return std::system_error(make_error_code(e));
-}
+public:
+    using pfs::error::error;
 
-inline std::system_error make_cast_exception (std::string const & from
-        , std::string const & to)
-{
-    return std::system_error(make_error_code(errc::type_error)
-            , std::string("can not cast from ") + from + " to " + to);
-}
+    error (errc ec)
+        : pfs::error(make_error_code(ec))
+    {}
 
-}} // // namespace pfs::json
+    error (errc ec
+        , std::string const & description
+        , std::string const & cause)
+        : pfs::error(make_error_code(ec), description, cause)
+    {}
 
+    error (errc ec
+        , std::string const & description)
+        : pfs::error(make_error_code(ec), description)
+    {}
+};
+
+} // namespace jeyson

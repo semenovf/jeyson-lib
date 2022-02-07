@@ -1,15 +1,16 @@
 ////////////////////////////////////////////////////////////////////////////////
-// Copyright (c) 2019 Vladislav Trifochkin
+// Copyright (c) 2019-2022 Vladislav Trifochkin
 //
-// This file is part of [pfs-json](https://github.com/semenovf/pfs-json) library.
+// This file is part of `jeyson-lib`.
 //
 // Changelog:
-//      2019.12.17 Initial version
+//      2019.12.17 Initial version (pfs-json).
+//      2022.02.07 Initial version (jeyson-lib).
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-namespace pfs {
-namespace json {
+namespace jeyson {
+namespace v1 {
 
 enum class type_enum : signed char // 8 signed byte
 {
@@ -29,4 +30,4 @@ inline constexpr int type_index ()
     return static_cast<int>(I);
 }
 
-}} // namespace pfs::json
+}} // namespace jeyson::v1

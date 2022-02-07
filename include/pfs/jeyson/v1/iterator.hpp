@@ -1,15 +1,24 @@
+////////////////////////////////////////////////////////////////////////////////
+// Copyright (c) 2020-2022 Vladislav Trifochkin
+//
+// This file is part of `jeyson-lib`.
+//
+// Changelog:
+//      2020.03.13 Initial version (pfs-json).
+//      2022.02.07 Initial version (jeyson-lib).
+////////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "constants.hpp"
-#include "error.hpp"
+#include "pfs/jeyson/error.hpp"
 #include "pfs/iterator.hpp"
 #include "pfs/variant.hpp"
 #include <cassert>
 
-namespace pfs {
-namespace json {
+namespace jeyson {
+namespace v1 {
 
 template <typename JsonValueType>
-class basic_iterator : public iterator_facade<bidirectional_iterator_tag
+class basic_iterator : public pfs::iterator_facade<pfs::bidirectional_iterator_tag
         , basic_iterator<JsonValueType>
         , JsonValueType
         , JsonValueType *
@@ -18,20 +27,20 @@ class basic_iterator : public iterator_facade<bidirectional_iterator_tag
 {
     friend JsonValueType;
 
-    using base_class = iterator_facade<bidirectional_iterator_tag
+    using base_class = pfs::iterator_facade<pfs::bidirectional_iterator_tag
             , basic_iterator<JsonValueType>
             , JsonValueType
             , JsonValueType *
             , JsonValueType &
             , std::ptrdiff_t>;
 
-    using scalar_iterator = pointer_proxy_iterator<JsonValueType>;
+    using scalar_iterator = pfs::pointer_proxy_iterator<JsonValueType>;
     using array_iterator  = typename JsonValueType::array_type::iterator;
     using object_iterator = typename JsonValueType::object_type::iterator;
 
     enum { scalar_iterator_index, array_iterator_index, object_iterator_index };
 
-    using mixed_iterator = std::variant<
+    using mixed_iterator = pfs::variant<
               scalar_iterator
             , array_iterator
             , object_iterator>;
@@ -49,7 +58,7 @@ protected:
     basic_iterator (pointer p) noexcept
         : _index(scalar_iterator_index)
     {
-        auto & native_it = std::get<scalar_iterator_index>(_mit);
+        auto & native_it = pfs::get<scalar_iterator_index>(_mit);
         native_it = p;
     }
 
@@ -59,7 +68,7 @@ protected:
     basic_iterator (array_iterator it) noexcept
         : _index(array_iterator_index)
     {
-        auto & native_it = std::get<array_iterator_index>(_mit);
+        auto & native_it = pfs::get<array_iterator_index>(_mit);
         native_it = it;
     }
 
@@ -69,7 +78,7 @@ protected:
     basic_iterator (object_iterator it) noexcept
         : _index(object_iterator_index)
     {
-        auto & native_it = std::get<object_iterator_index>(_mit);
+        auto & native_it = pfs::get<object_iterator_index>(_mit);
         native_it = it;
     }
 
@@ -77,14 +86,14 @@ protected:
     {
         switch (_index) {
             case array_iterator_index:
-                return *std::get<array_iterator_index>(_mit);
+                return *pfs::get<array_iterator_index>(_mit);
             case object_iterator_index:
-                return std::get<object_iterator_index>(_mit)->second;
+                return pfs::get<object_iterator_index>(_mit)->second;
             default:
                 break;
         }
 
-        return *std::get<scalar_iterator_index>(_mit);
+        return *pfs::get<scalar_iterator_index>(_mit);
     }
 
     const pointer ptr () const
@@ -101,14 +110,14 @@ public:
     {
         switch (_index) {
             case array_iterator_index:
-                return *std::get<array_iterator_index>(_mit);
+                return *pfs::get<array_iterator_index>(_mit);
             case object_iterator_index:
-                return std::get<object_iterator_index>(_mit)->second;
+                return pfs::get<object_iterator_index>(_mit)->second;
             default:
                 break;
         }
 
-        return *std::get<scalar_iterator_index>(_mit);
+        return *pfs::get<scalar_iterator_index>(_mit);
     }
 
     pointer ptr ()
@@ -121,13 +130,13 @@ public:
     {
         switch (_index) {
             case scalar_iterator_index:
-                ++std::get<scalar_iterator_index>(_mit);
+                ++pfs::get<scalar_iterator_index>(_mit);
                 break;
             case array_iterator_index:
-                ++std::get<array_iterator_index>(_mit);
+                ++pfs::get<array_iterator_index>(_mit);
                 break;
             case object_iterator_index:
-                ++std::get<object_iterator_index>(_mit);
+                ++pfs::get<object_iterator_index>(_mit);
                 break;
         }
     }
@@ -136,13 +145,13 @@ public:
     {
         switch (_index) {
             case scalar_iterator_index:
-                --std::get<scalar_iterator_index>(_mit);
+                --pfs::get<scalar_iterator_index>(_mit);
                 break;
             case array_iterator_index:
-                --std::get<array_iterator_index>(_mit);
+                --pfs::get<array_iterator_index>(_mit);
                 break;
             case object_iterator_index:
-                --std::get<object_iterator_index>(_mit);
+                --pfs::get<object_iterator_index>(_mit);
                 break;
         }
     }
@@ -156,4 +165,4 @@ public:
     }
 };
 
-}} // pfs::json
+}} // namespace jeyson::v1
