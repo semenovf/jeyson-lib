@@ -1,6 +1,8 @@
 !.gitignore
 
 .settings/
+.vs/
+.vscode/
 .build*/
 build*/
 .kdev4/
@@ -10,7 +12,6 @@ build*/
 doxygen/
 nbproject/
 src/tmp/
-pfs-common/
 
 .coveralls.yml
 #Makefile
@@ -52,3 +53,4 @@ moc_*.cpp
 qrc_*.cpp
 .sconsign.dblite
 Doxyget.err
+CMakeSettings.json

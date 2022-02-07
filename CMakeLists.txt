@@ -1,33 +1,41 @@
-cmake_minimum_required (VERSION 3.5)
-project(pfs-json CXX)
-
-option(${PROJECT_NAME}_BUILD_TESTS "Build tests" OFF)
-
 ################################################################################
-# Find `pfs::common` library root directory and configure it
+# Copyright (c) 2019-2022 Vladislav Trifochkin
+#
+# This file is part of `jeyson-lib`.
+#
+# Changelog:
+#      2019.11.05 Initial version (pfs-json).
+#      2022.02.07 Renamed into jeyson-lib.
 ################################################################################
-if (NOT TARGET pfs::common)
-    include(${CMAKE_CURRENT_LIST_DIR}/cmake/FindDirectory.cmake)
-    find_directory(pfs-common_DIR
-        FILENAME pfs_common_library.hpp
-        RELATIVE ${CMAKE_CURRENT_LIST_DIR})
+cmake_minimum_required (VERSION 3.11)
+project(jeyson-lib-ALL CXX)
 
-    if (NOT pfs-common_DIR)
-        message(FATAL_ERROR "pfs::common library directory not found")
-    endif()
+option(JEYSON__BUILD_STRICT "Build with strict policies: C++ standard required, C++ extension is OFF etc" ON)
+option(JEYSON__BUILD_TESTS "Build tests" OFF)
+option(JEYSON__BUILD_DEMO "Build examples/demo" OFF)
+option(JEYSON__ENABLE_COVERAGE "Build tests with coverage support" OFF)
 
-    message(STATUS "pfs::common directory found at: [${pfs-common_DIR}]")
-
-    add_subdirectory(${pfs-common_DIR})
+if (NOT PORTABLE_TARGET__ENABLED)
+    list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/3rdparty/portable-target/cmake/v2)
+    include(PortableTarget)
+    portable_target(SET ENABLE_TRACE ON)
 endif()
-################################################################################
 
-add_library(${PROJECT_NAME} INTERFACE)
-add_library(pfs::json ALIAS ${PROJECT_NAME})
-target_include_directories(${PROJECT_NAME} INTERFACE ${CMAKE_CURRENT_LIST_DIR}/include)
-target_link_libraries(${PROJECT_NAME} INTERFACE pfs::common)
+message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER}")
+message(STATUS "C++ compiler version: ${CMAKE_CXX_COMPILER_VERSION}")
 
-if (${PROJECT_NAME}_BUILD_TESTS)
+if (JEYSON__BUILD_STRICT)
+    set(CXX_STANDARD_REQUIRED ON)
+    set(CMAKE_CXX_EXTENSIONS OFF) # use -std=c++XX rather than -std=gnu++XX
+endif()
+
+include(${CMAKE_CURRENT_LIST_DIR}/library.cmake)
+
+if (JEYSON__BUILD_TESTS AND EXISTS ${CMAKE_CURRENT_LIST_DIR}/tests)
     enable_testing()
     add_subdirectory(tests)
+endif()
+
+if (JEYSON__BUILD_DEMO AND EXISTS ${CMAKE_CURRENT_LIST_DIR}/demo)
+    add_subdirectory(demo)
 endif()
