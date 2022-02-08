@@ -20,19 +20,21 @@ enum class errc
       success = 0
 
 // Parser errors
-    , forbidden_root_element
-    , unbalanced_quote
-    , bad_escaped_char
-    , bad_encoded_char
-    , unbalanced_array_bracket
-    , unbalanced_object_bracket
-    , bad_member_name
-    , bad_json_sequence
+//     , forbidden_root_element
+//     , unbalanced_quote
+//     , bad_escaped_char
+//     , bad_encoded_char
+//     , unbalanced_array_bracket
+//     , unbalanced_object_bracket
+//     , bad_member_name
+//     , bad_json_sequence
 
-//
-    , type_error
-    , type_cast_error
-    , null_pointer
+    , incopatible_type
+    , invalid_argument
+    , overflow
+//     , type_error
+//     , type_cast_error
+//     , null_pointer
 };
 
 class error_category : public std::error_category
@@ -48,31 +50,37 @@ public:
         switch (ev) {
             case static_cast<int>(errc::success):
                 return std::string{"no error"};
-            case static_cast<int>(errc::forbidden_root_element):
-                return std::string{"root element is forbidden"};
-            case static_cast<int>(errc::unbalanced_quote):
-                return std::string{"unquoted string"};
-            case static_cast<int>(errc::bad_escaped_char):
-                return std::string{"bad escaped char"};
-            case static_cast<int>(errc::bad_encoded_char):
-                return std::string{"bad encoded char"};
-            case static_cast<int>(errc::unbalanced_array_bracket):
-                return std::string{"unbalanced array bracket"};
-            case static_cast<int>(errc::unbalanced_object_bracket):
-                return std::string{"unbalanced object bracket"};
-            case static_cast<int>(errc::bad_member_name):
-                return std::string{"bad member name"};
-            case static_cast<int>(errc::bad_json_sequence):
-                return std::string{"bad json sequence"};
+//             case static_cast<int>(errc::forbidden_root_element):
+//                 return std::string{"root element is forbidden"};
+//             case static_cast<int>(errc::unbalanced_quote):
+//                 return std::string{"unquoted string"};
+//             case static_cast<int>(errc::bad_escaped_char):
+//                 return std::string{"bad escaped char"};
+//             case static_cast<int>(errc::bad_encoded_char):
+//                 return std::string{"bad encoded char"};
+//             case static_cast<int>(errc::unbalanced_array_bracket):
+//                 return std::string{"unbalanced array bracket"};
+//             case static_cast<int>(errc::unbalanced_object_bracket):
+//                 return std::string{"unbalanced object bracket"};
+//             case static_cast<int>(errc::bad_member_name):
+//                 return std::string{"bad member name"};
+//             case static_cast<int>(errc::bad_json_sequence):
+//                 return std::string{"bad json sequence"};
 
-            case static_cast<int>(errc::type_error):
-                return std::string{"type error"};
+            case static_cast<int>(errc::incopatible_type):
+                return std::string{"incopatible type"};
 
-            case static_cast<int>(errc::type_cast_error):
-                return std::string{"type cast error"};
+            case static_cast<int>(errc::invalid_argument):
+                return std::string{"invalid argument"};
 
-            case static_cast<int>(errc::null_pointer):
-                return std::string{"null pointer"};
+//             case static_cast<int>(errc::type_error):
+//                 return std::string{"type error"};
+//
+//             case static_cast<int>(errc::type_cast_error):
+//                 return std::string{"type cast error"};
+//
+//             case static_cast<int>(errc::null_pointer):
+//                 return std::string{"null pointer"};
 
             default: return std::string{"unknown JSON error"};
         }
