@@ -8,7 +8,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "pfs/jeyson/error.hpp"
-#include <limits>
+#include "pfs/filesystem.hpp"
+#include "pfs/optional.hpp"
 #include <string>
 #include <type_traits>
 #include <cstddef>
@@ -28,11 +29,14 @@ public:
     using const_reference = const json;
 
 private:
-    typename Backend::rep_type _d;
+    using rep_type = typename Backend::rep_type;
 
 private:
-    json (typename Backend::rep_type const & rep);
-    json (typename Backend::rep_type && rep);
+    rep_type _d;
+
+private:
+    json (rep_type const & rep);
+    json (rep_type && rep);
 
 public:
 ////////////////////////////////////////////////////////////////////////////////
@@ -90,6 +94,72 @@ public:
     operator bool () const noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
+// Element access
+////////////////////////////////////////////////////////////////////////////////
+    /**
+     * Returns a reference to the element at specified location @a pos.
+     * In case of out of bounds, the result is a reference to an invalid value.
+     */
+    reference operator [] (size_type pos);
+
+    /**
+     * Returns a reference to the element at specified location @a pos.
+     *
+     * @note This overloaded methods needs to avoid ambiguity for zero (0) index
+     */
+    reference operator [] (int pos)
+    {
+        return this->operator[] (static_cast<size_type>(pos));
+    }
+
+    /**
+     * Returns a constant reference to the element at specified location @a pos.
+     * In case of out of bounds, the result is a reference to an invalid value.
+     */
+    const_reference const operator [] (size_type pos) const;
+
+    /**
+     * Returns a reference to the element at specified location @a pos.
+     *
+     * @note This overloaded methods needs to avoid ambiguity for zero (0) index
+     */
+    const_reference operator [] (int pos) const
+    {
+        return this->operator[] (static_cast<size_type>(pos));
+    }
+
+    /**
+     * Returns a reference to the value that is mapped to a key equivalent
+     * to @a key, performing an insertion if such key does not already exist.
+     */
+    reference operator [] (key_type const & key);
+
+    /**
+     * Returns a reference to the value that is mapped to a key equivalent
+     * to @a key. In case of out of bounds, the result is a reference to an
+     * invalid value.
+     */
+    const_reference operator [] (key_type const & key) const;
+
+    /**
+     * Returns a reference to the value that is mapped to a key equivalent
+     * to @a key.
+     */
+    reference operator [] (char const * key);
+
+    /**
+     * Returns a reference to the value that is mapped to a key equivalent
+     * to @a key.
+     */
+    const_reference operator [] (char const * key) const;
+
+    /**
+     *
+     */
+    template <typename T, typename U>
+    friend pfs::optional<T> get (json<U> const & j) noexcept;
+
+////////////////////////////////////////////////////////////////////////////////
 // Capacity
 ////////////////////////////////////////////////////////////////////////////////
     /**
@@ -142,31 +212,50 @@ public:
 
     /// Check if JSON value is null.
     template <typename U>
-    friend bool is_null (json<U> const & j);
+    friend bool is_null (json<U> const & j) noexcept;
 
     /// Check if JSON value is boolean.
     template <typename U>
-    friend bool is_bool (json<U> const & j);
+    friend bool is_bool (json<U> const & j) noexcept;
 
     /// Check if JSON value is integer.
     template <typename U>
-    friend bool is_integer (json<U> const & j);
+    friend bool is_integer (json<U> const & j) noexcept;
 
     /// Check if JSON value is real.
     template <typename U>
-    friend bool is_real (json<U> const & j);
+    friend bool is_real (json<U> const & j) noexcept;
 
     /// Check if JSON value is string.
     template <typename U>
-    friend bool is_string (json<U> const & j);
+    friend bool is_string (json<U> const & j) noexcept;
 
     /// Check if JSON value is array.
     template <typename U>
-    friend bool is_array (json<U> const & j);
+    friend bool is_array (json<U> const & j) noexcept;
 
     /// Check if JSON value is object.
     template <typename U>
-    friend bool is_object (json<U> const & j);
+    friend bool is_object (json<U> const & j) noexcept;
+
+////////////////////////////////////////////////////////////////////////////////
+// Stringification
+////////////////////////////////////////////////////////////////////////////////
+    template <typename U>
+    friend std::string to_string (json<U> const & j) noexcept;
+
+////////////////////////////////////////////////////////////////////////////////
+// Parsing
+////////////////////////////////////////////////////////////////////////////////
+    /**
+     * Decodes JSON from string
+     */
+    static json parse (std::string const & source, error * err = nullptr) noexcept;
+
+    /**
+     * Decodes JSON from file
+     */
+    static json parse (pfs::filesystem::path const & path, error * err = nullptr) noexcept;
 };
 
 template <typename Backend>
@@ -179,37 +268,43 @@ inline bool operator != (json<Backend> const & lhs, json<Backend> const & rhs)
 }
 
 template <typename Backend>
-bool is_null (json<Backend> const & j);
+bool is_null (json<Backend> const & j) noexcept;
 
 template <typename Backend>
-bool is_bool (json<Backend> const & j);
+bool is_bool (json<Backend> const & j) noexcept;
 
 template <typename Backend>
-bool is_integer (json<Backend> const & j);
+bool is_integer (json<Backend> const & j) noexcept;
 
 template <typename Backend>
-bool is_real (json<Backend> const & j);
+bool is_real (json<Backend> const & j) noexcept;
 
 template <typename Backend>
-bool is_string (json<Backend> const & j);
+bool is_string (json<Backend> const & j) noexcept;
 
 template <typename Backend>
-bool is_array (json<Backend> const & j);
+bool is_array (json<Backend> const & j) noexcept;
 
 template <typename Backend>
-bool is_object (json<Backend> const & j);
+bool is_object (json<Backend> const & j) noexcept;
 
 template <typename Backend>
-inline bool is_scalar (json<Backend> const & j)
+inline bool is_scalar (json<Backend> const & j) noexcept
 {
     return is_null(j) || is_bool(j) || is_integer(j)
         || is_real(j) || is_string(j);
 }
 
 template <typename Backend>
-inline bool is_structured (json<Backend> const & j)
+inline bool is_structured (json<Backend> const & j) noexcept
 {
     return is_array(j) || is_object(j);
 }
+
+template <typename T, typename Backend>
+pfs::optional<T> get (json<Backend> const & j) noexcept;
+
+template <typename Backend>
+std::string to_string (json<Backend> const & j) noexcept;
 
 } // namespace jeyson

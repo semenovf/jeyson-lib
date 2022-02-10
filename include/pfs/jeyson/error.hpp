@@ -28,6 +28,7 @@ enum class errc
 //     , unbalanced_object_bracket
 //     , bad_member_name
 //     , bad_json_sequence
+    , backend_error
 
     , incopatible_type
     , invalid_argument
@@ -66,6 +67,9 @@ public:
 //                 return std::string{"bad member name"};
 //             case static_cast<int>(errc::bad_json_sequence):
 //                 return std::string{"bad json sequence"};
+
+            case static_cast<int>(errc::backend_error):
+                return std::string{"backend error"};
 
             case static_cast<int>(errc::incopatible_type):
                 return std::string{"incopatible type"};

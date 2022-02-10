@@ -259,9 +259,68 @@ void run_tests ()
 
         REQUIRE_EQ(j.size(), 5);
 
-        REQUIRE_EQ(is_null(j[0]));
-//         REQUIRE_EQ(jeyson::get<bool>(j[1]), true);
-//         REQUIRE_EQ(jeyson::get<int>(j[2]), 42);
+        REQUIRE(is_null(j[0]));
+        REQUIRE(is_bool(j[1]));
+        REQUIRE(is_integer(j[2]));
+        REQUIRE(is_real(j[3]));
+        REQUIRE(is_string(j[4]));
+
+        REQUIRE_EQ(*jeyson::get<bool>(j[1]), true);
+        REQUIRE_EQ(*jeyson::get<int>(j[2]), 42);
+        REQUIRE_EQ(*jeyson::get<float>(j[3]), float{3.14});
+    }
+
+////////////////////////////////////////////////////////////////////////////////
+// Stringification
+////////////////////////////////////////////////////////////////////////////////
+    {
+        json j;
+        j.push_back(json{nullptr});
+        j.push_back(json{true});
+        j.push_back(json{42});
+
+        REQUIRE_EQ(to_string(j), std::string{"[null,true,42]"});
+    }
+
+////////////////////////////////////////////////////////////////////////////////
+// Parsing
+////////////////////////////////////////////////////////////////////////////////
+    {
+        // Good
+        {
+            std::string s {"[null,true,42]"};
+            auto j = json::parse(s);
+
+            REQUIRE(j);
+
+            REQUIRE(is_null(j[0]));
+            REQUIRE(is_bool(j[1]));
+            REQUIRE(is_integer(j[2]));
+            REQUIRE_EQ(*jeyson::get<bool>(j[1]), true);
+            REQUIRE_EQ(*jeyson::get<int>(j[2]), 42);
+        }
+
+        // Bad
+        {
+            std::string s {"[null"};
+            auto j = json::parse(s);
+
+            REQUIRE_FALSE(j);
+        }
+
+        {
+            auto j1 = json::parse(pfs::filesystem::utf8_decode("data/twitter.json"));
+            auto j2 = json::parse(pfs::filesystem::utf8_decode("data/canada.json"));
+            auto j3 = json::parse(pfs::filesystem::utf8_decode("data/citm_catalog.json"));
+
+            REQUIRE(j1);
+            REQUIRE(j2);
+            REQUIRE(j3);
+
+            auto code = j1["statuses"][0]["metadata"]["iso_language_code"];
+            REQUIRE_EQ(*jeyson::get<std::string>(code), std::string{"ja"});
+        }
+
     }
 }
 
