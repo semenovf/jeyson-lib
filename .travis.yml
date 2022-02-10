@@ -111,10 +111,12 @@ before_script:
   - if [[ "${CXX_COMPILER}" != "" ]]; then export CXX=${CXX_COMPILER}; fi
   - if [[ "${CC_COMPILER}" != "" ]]; then export CC=${CC_COMPILER}; fi
   - if [[ "${BUILD_TYPE}" == "" ]]; then export BUILD_TYPE=Release; fi
+  - export CMAKE_OPTIONS="-DJEYSON__ENABLE_JANSSON=ON"
+  - export PROJECT_OPT_PREFIX=JEYSON__
+  - export BUILD_TESTS=ON
   - uname -a
   - $CXX --version
-  - mkdir -p build && cd build
-  - cmake -G Ninja -DCMAKE_CXX_STANDARD=${CXX_STANDARD} -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${BUILD_TYPE} ${CMAKE_OPTIONS} ..
+  - sh build.sh
 
 script:
   - cmake --build .
