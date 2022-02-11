@@ -220,6 +220,20 @@ void run_tests ()
         REQUIRE(is_integer(j2));
     }
 
+    {
+        json j;
+        j.push_back(json{"Hello"});
+        auto ref = j[0];
+
+        json j1{ref};
+
+        REQUIRE(is_array(j));
+        REQUIRE(is_string(ref));
+        REQUIRE(is_string(j1));
+        REQUIRE_EQ(*jeyson::get<std::string>(ref), std::string{"Hello"});
+        REQUIRE_EQ(*jeyson::get<std::string>(j1), std::string{"Hello"});
+    }
+
 ////////////////////////////////////////////////////////////////////////////////
 // Comparison operators
 ////////////////////////////////////////////////////////////////////////////////
@@ -320,7 +334,6 @@ void run_tests ()
             auto code = j1["statuses"][0]["metadata"]["iso_language_code"];
             REQUIRE_EQ(*jeyson::get<std::string>(code), std::string{"ja"});
         }
-
     }
 }
 
