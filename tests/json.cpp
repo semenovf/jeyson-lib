@@ -284,6 +284,30 @@ void run_tests ()
         REQUIRE_EQ(*jeyson::get<float>(j[3]), float{3.14});
     }
 
+    {
+        json j;
+        j["KEY1"] = json{42};
+        j["KEY2"] = json{"Hello"};
+
+        REQUIRE_EQ(*jeyson::get<int>(j["KEY1"]), 42);
+        REQUIRE_EQ(*jeyson::get<std::string>(j["KEY2"]), std::string{"Hello"});
+    }
+
+    {
+        json j;
+        j.push_back(json{1});
+        j.push_back(json{"?"});
+
+        REQUIRE_EQ(*jeyson::get<int>(j[0]), 1);
+        REQUIRE_EQ(*jeyson::get<std::string>(j[1]), std::string{"?"});
+
+        j[0] = json{42};
+        j[1] = json{"Hello"};
+
+        REQUIRE_EQ(*jeyson::get<int>(j[0]), 42);
+        REQUIRE_EQ(*jeyson::get<std::string>(j[1]), std::string{"Hello"});
+    }
+
 ////////////////////////////////////////////////////////////////////////////////
 // Stringification
 ////////////////////////////////////////////////////////////////////////////////

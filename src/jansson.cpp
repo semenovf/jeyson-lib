@@ -20,6 +20,40 @@ static_assert(std::numeric_limits<std::intmax_t>::max()
     == std::numeric_limits<json_int_t>::max()
     , "");
 
+jansson_backend::rep_type::rep_type () = default;
+
+jansson_backend::rep_type::rep_type (rep_type const & other)
+    : ptr(other.ptr)
+    , refdata(other.refdata)
+{}
+
+jansson_backend::rep_type::rep_type (rep_type && other)
+    : ptr(other.ptr)
+    , refdata(std::move(other.refdata))
+{
+    other.ptr = nullptr;
+}
+
+jansson_backend::rep_type::rep_type (json_t * p)
+    : ptr(p)
+{}
+
+jansson_backend::rep_type::rep_type (json_t * p, json_t * parent, size_type index)
+    : ptr(p)
+{
+    refdata = std::make_shared<refdata_type>();
+    refdata->parent = parent;
+    refdata->index.i = index;
+}
+
+jansson_backend::rep_type::rep_type (json_t * p, json_t * parent, std::string const & key)
+    : ptr(p)
+{
+    refdata = std::make_shared<refdata_type>();
+    refdata->parent = parent;
+    refdata->index.key = key;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Constructors, destructors, assignment operators
 ////////////////////////////////////////////////////////////////////////////////
@@ -40,37 +74,37 @@ json<jansson_backend>::json ()
 
 template <>
 json<jansson_backend>::json (std::nullptr_t)
-    : _d(json_null(), nullptr)
+    : _d(json_null())
 {}
 
 template <>
 json<jansson_backend>::json (bool value)
-    : _d(json_boolean(value), nullptr)
+    : _d(json_boolean(value))
 {}
 
 template <>
 json<jansson_backend>::json (std::intmax_t value)
-    : _d(json_integer(value), nullptr)
+    : _d(json_integer(value))
 {}
 
 template <>
 json<jansson_backend>::json (double value)
-    : _d(json_real(value), nullptr)
+    : _d(json_real(value))
 {}
 
 template <>
 json<jansson_backend>::json (std::string const & value)
-    : _d(json_stringn(value.c_str(), value.size()), nullptr)
+    : _d(json_stringn(value.c_str(), value.size()))
 {}
 
 template <>
 json<jansson_backend>::json (char const * value)
-    : _d(json_string(value), nullptr)
+    : _d(json_string(value))
 {}
 
 template <>
 json<jansson_backend>::json (char const * value, std::size_t n)
-    : _d(json_stringn_nocheck(value, n), nullptr)
+    : _d(json_stringn_nocheck(value, n))
 {}
 
 template <>
@@ -86,7 +120,7 @@ json<jansson_backend>::json (json && other)
 {
     if (other._d.ptr) {
         _d.ptr = other._d.ptr;
-        _d.parent = nullptr;
+        _d.refdata = std::move(other._d.refdata);
         other._d.ptr = nullptr;
     }
 }
@@ -94,8 +128,7 @@ json<jansson_backend>::json (json && other)
 template <>
 json<jansson_backend>::~json ()
 {
-    // !_d.parent -> implies a reference
-    if (_d.ptr && !_d.parent)
+    if (_d.ptr && !_d.refdata)
         json_decref(_d.ptr);
 }
 
@@ -104,8 +137,34 @@ json<jansson_backend> & json<jansson_backend>::operator = (json const & other)
 {
     if (this != & other) {
         if (_d.ptr != other._d.ptr) {
-            this->~json();
-            _d.ptr = json_deep_copy(other._d.ptr);
+            // Reference
+            if (_d.refdata) {
+                assert(_d.refdata->parent);
+                assert(json_is_array(_d.refdata->parent) || json_is_object(_d.refdata->parent));
+
+                if (json_is_array(_d.refdata->parent)) {
+                    auto rc = json_array_set(_d.refdata->parent
+                        , _d.refdata->index.i
+                        , json_deep_copy(other._d.ptr));
+
+                    if (rc != 0) {
+                        JEYSON__THROW((error{errc::backend_error, "update array element failure"}));
+                    }
+                } else {
+                    auto rc = json_object_setn(_d.refdata->parent
+                        , _d.refdata->index.key.c_str()
+                        , _d.refdata->index.key.size()
+                        , json_deep_copy(other._d.ptr));
+
+                    if (rc != 0) {
+                        JEYSON__THROW((error{errc::backend_error, "update object element failure"}));
+                    }
+                }
+            } else {
+                this->~json();
+                _d.ptr = json_deep_copy(other._d.ptr);
+                _d.refdata = other._d.refdata;
+            }
         }
     }
 
@@ -117,12 +176,39 @@ json<jansson_backend> & json<jansson_backend>::operator = (json && other)
 {
     if (this != & other) {
         if (_d.ptr != other._d.ptr) {
-            this->~json();
+            // Reference
+            if (_d.refdata) {
+                assert(_d.refdata->parent);
+                assert(json_is_array(_d.refdata->parent) || json_is_object(_d.refdata->parent));
 
-            if (other._d.ptr) {
-                _d.ptr = other._d.ptr;
-                _d.parent = nullptr;
+                if (json_is_array(_d.refdata->parent)) {
+                    auto rc = json_array_set(_d.refdata->parent
+                        , _d.refdata->index.i
+                        , other._d.ptr);
+
+                    if (rc != 0) {
+                        JEYSON__THROW((error{errc::backend_error, "update array element failure"}));
+                    }
+                } else {
+                    auto rc = json_object_setn(_d.refdata->parent
+                        , _d.refdata->index.key.c_str()
+                        , _d.refdata->index.key.size()
+                        , other._d.ptr);
+
+                    if (rc != 0) {
+                        JEYSON__THROW((error{errc::backend_error, "update object element failure"}));
+                    }
+                }
+
                 other._d.ptr = nullptr;
+            } else {
+                this->~json();
+
+                if (other._d.ptr) {
+                    _d.ptr = other._d.ptr;
+                    _d.refdata = std::move(other._d.refdata);
+                    other._d.ptr = nullptr;
+                }
             }
         }
     }
@@ -192,8 +278,12 @@ template <>
 json<jansson_backend>::reference
 json<jansson_backend>::operator [] (size_type pos)
 {
+    if (!_d.ptr) {
+        _d.ptr = json_array();
+    }
+
     auto ptr = array_elem_checked(_d.ptr, pos);
-    return ptr ? json{rep_type{ptr, _d.ptr}} : json{};
+    return ptr ? json{rep_type{ptr, _d.ptr, pos}} : json{};
 }
 
 template <>
@@ -201,15 +291,19 @@ json<jansson_backend>::const_reference
 json<jansson_backend>::operator [] (size_type pos) const
 {
     auto ptr = array_elem_checked(_d.ptr, pos);
-    return ptr ? json{rep_type{ptr, _d.ptr}} : json{};
+    return ptr ? json{rep_type{ptr, _d.ptr, pos}} : json{};
 }
 
 template <>
 json<jansson_backend>::reference
 json<jansson_backend>::operator [] (key_type const & key)
 {
+    if (!_d.ptr) {
+        _d.ptr = json_object();
+    }
+
     auto ptr = object_elem_checked(_d.ptr, key.c_str(), key.size(), true);
-    return ptr ? json{rep_type{ptr, _d.ptr}} : json{};
+    return ptr ? json{rep_type{ptr, _d.ptr, key}} : json{};
 }
 
 template <>
@@ -217,7 +311,7 @@ json<jansson_backend>::const_reference
 json<jansson_backend>::operator [] (key_type const & key) const
 {
     auto ptr = object_elem_checked(_d.ptr, key.c_str(), key.size(), false);
-    return ptr ? json{rep_type{ptr, _d.ptr}} : json{};
+    return ptr ? json{rep_type{ptr, _d.ptr, key}} : json{};
 }
 
 ////
@@ -225,8 +319,12 @@ template <>
 json<jansson_backend>::reference
 json<jansson_backend>::operator [] (char const * key)
 {
+    if (!_d.ptr) {
+        _d.ptr = json_object();
+    }
+
     auto ptr = object_elem_checked(_d.ptr, key, std::strlen(key), true);
-    return ptr ? json{rep_type{ptr, _d.ptr}} : json{};
+    return ptr ? json{rep_type{ptr, _d.ptr, std::string{key}}} : json{};
 }
 
 template <>
@@ -234,7 +332,7 @@ json<jansson_backend>::const_reference
 json<jansson_backend>::operator [] (char const * key) const
 {
     auto ptr = object_elem_checked(_d.ptr, key, std::strlen(key), false);
-    return ptr ? json{rep_type{ptr, _d.ptr}} : json{};
+    return ptr ? json{rep_type{ptr, _d.ptr, std::string{key}}} : json{};
 }
 
 namespace details {
@@ -560,7 +658,7 @@ json<jansson_backend>::push_back (json const & value)
     if (!is_array(*this))
         JEYSON__THROW(error(errc::incopatible_type));
 
-    json j{rep_type{json_deep_copy(value._d.ptr), nullptr}};
+    json j{rep_type{json_deep_copy(value._d.ptr)}};
 
     this->push_back(std::move(j));
 }
@@ -623,7 +721,7 @@ json<jansson_backend>::parse (std::string const & source, error * err) noexcept
         return json<jansson_backend>{};
     }
 
-    return json<jansson_backend>{json<jansson_backend>::rep_type{j, nullptr}};
+    return json<jansson_backend>{json<jansson_backend>::rep_type{j}};
 }
 
 template <>
@@ -650,7 +748,7 @@ json<jansson_backend>::parse (pfs::filesystem::path const & path, error * err) n
         return json<jansson_backend>{};
     }
 
-    return json<jansson_backend>{json<jansson_backend>::rep_type{j, nullptr}};
+    return json<jansson_backend>{json<jansson_backend>::rep_type{j}};
 }
 
 } // namespace jeyson
