@@ -593,7 +593,11 @@ template <>
 std::string to_string (json<jansson_backend> const & j) noexcept
 {
     std::string result;
-    json_dump_callback(j._d.ptr, json_dump_callback, & result, JSON_COMPACT);
+
+    if (j) {
+        json_dump_callback(j._d.ptr, json_dump_callback, & result, JSON_COMPACT);
+    }
+
     return result;
 }
 
