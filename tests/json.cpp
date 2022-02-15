@@ -230,8 +230,8 @@ void run_tests ()
         REQUIRE(is_array(j));
         REQUIRE(is_string(ref));
         REQUIRE(is_string(j1));
-        REQUIRE_EQ(*jeyson::get<std::string>(ref), std::string{"Hello"});
-        REQUIRE_EQ(*jeyson::get<std::string>(j1), std::string{"Hello"});
+        REQUIRE_EQ(jeyson::get<std::string>(ref), std::string{"Hello"});
+        REQUIRE_EQ(jeyson::get<std::string>(j1), std::string{"Hello"});
     }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -279,9 +279,9 @@ void run_tests ()
         REQUIRE(is_real(j[3]));
         REQUIRE(is_string(j[4]));
 
-        REQUIRE_EQ(*jeyson::get<bool>(j[1]), true);
-        REQUIRE_EQ(*jeyson::get<int>(j[2]), 42);
-        REQUIRE_EQ(*jeyson::get<float>(j[3]), float{3.14});
+        REQUIRE_EQ(jeyson::get<bool>(j[1]), true);
+        REQUIRE_EQ(jeyson::get<int>(j[2]), 42);
+        REQUIRE_EQ(jeyson::get<float>(j[3]), float{3.14});
     }
 
     {
@@ -289,8 +289,8 @@ void run_tests ()
         j["KEY1"] = json{42};
         j["KEY2"] = json{"Hello"};
 
-        REQUIRE_EQ(*jeyson::get<int>(j["KEY1"]), 42);
-        REQUIRE_EQ(*jeyson::get<std::string>(j["KEY2"]), std::string{"Hello"});
+        REQUIRE_EQ(jeyson::get<int>(j["KEY1"]), 42);
+        REQUIRE_EQ(jeyson::get<std::string>(j["KEY2"]), std::string{"Hello"});
     }
 
     {
@@ -298,14 +298,14 @@ void run_tests ()
         j.push_back(json{1});
         j.push_back(json{"?"});
 
-        REQUIRE_EQ(*jeyson::get<int>(j[0]), 1);
-        REQUIRE_EQ(*jeyson::get<std::string>(j[1]), std::string{"?"});
+        REQUIRE_EQ(jeyson::get<int>(j[0]), 1);
+        REQUIRE_EQ(jeyson::get<std::string>(j[1]), std::string{"?"});
 
         j[0] = json{42};
         j[1] = json{"Hello"};
 
-        REQUIRE_EQ(*jeyson::get<int>(j[0]), 42);
-        REQUIRE_EQ(*jeyson::get<std::string>(j[1]), std::string{"Hello"});
+        REQUIRE_EQ(jeyson::get<int>(j[0]), 42);
+        REQUIRE_EQ(jeyson::get<std::string>(j[1]), std::string{"Hello"});
     }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -334,8 +334,8 @@ void run_tests ()
             REQUIRE(is_null(j[0]));
             REQUIRE(is_bool(j[1]));
             REQUIRE(is_integer(j[2]));
-            REQUIRE_EQ(*jeyson::get<bool>(j[1]), true);
-            REQUIRE_EQ(*jeyson::get<int>(j[2]), 42);
+            REQUIRE_EQ(jeyson::get<bool>(j[1]), true);
+            REQUIRE_EQ(jeyson::get<int>(j[2]), 42);
         }
 
         // Bad
@@ -356,7 +356,7 @@ void run_tests ()
             REQUIRE(j3);
 
             auto code = j1["statuses"][0]["metadata"]["iso_language_code"];
-            REQUIRE_EQ(*jeyson::get<std::string>(code), std::string{"ja"});
+            REQUIRE_EQ(jeyson::get<std::string>(code), std::string{"ja"});
         }
     }
 }

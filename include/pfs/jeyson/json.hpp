@@ -157,7 +157,7 @@ public:
      *
      */
     template <typename T, typename U>
-    friend pfs::optional<T> get (json<U> const & j) noexcept;
+    friend T get (json<U> const & j, bool * success) noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Capacity
@@ -188,7 +188,7 @@ public:
      *         and it is not an error.
      * @throws @c error { @c errc::invalid_argument } if @a value is uninitialized.
      */
-    void push_back (json const & value);
+    void push_back (json const & value, error * perr = nullptr);
 
     /**
      * Appends the given element @a value to the end of the array.
@@ -198,7 +198,7 @@ public:
      *         and it is not an error.
      * @throws @c error { @c errc::invalid_argument } if @a value is uninitialized.
      */
-    void push_back (json && value);
+    void push_back (json && value, error * perr = nullptr);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Comparison operators
@@ -250,12 +250,12 @@ public:
     /**
      * Decodes JSON from string
      */
-    static json parse (std::string const & source, error * err = nullptr) noexcept;
+    static json parse (std::string const & source, error * perr = nullptr) noexcept;
 
     /**
      * Decodes JSON from file
      */
-    static json parse (pfs::filesystem::path const & path, error * err = nullptr) noexcept;
+    static json parse (pfs::filesystem::path const & path, error * perr = nullptr) noexcept;
 };
 
 template <typename Backend>
@@ -302,7 +302,15 @@ inline bool is_structured (json<Backend> const & j) noexcept
 }
 
 template <typename T, typename Backend>
-pfs::optional<T> get (json<Backend> const & j) noexcept;
+T get (json<Backend> const & j, bool * success = nullptr) noexcept;
+
+template <typename T, typename Backend>
+inline T get_or (json<Backend> const & j, T const & default_value) noexcept
+{
+    bool success = true;
+    auto result = get<T, Backend>(j, & success);
+    return success ? result : default_value;
+}
 
 template <typename Backend>
 std::string to_string (json<Backend> const & j) noexcept;

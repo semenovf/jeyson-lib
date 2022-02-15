@@ -337,221 +337,266 @@ json<jansson_backend>::operator [] (char const * key) const
 
 namespace details {
 
-bool get (json_t * j, bool * result) noexcept
+std::intmax_t get (json_t * j
+    , std::intmax_t min, std::intmax_t max
+    , bool * success) noexcept
 {
-    if (! j)
-        return false;
+    if (success)
+        *success = true;
 
-    if (!json_is_boolean(j))
-        return false;
+    if (! j) {
+        if (success)
+            *success = false;
+        else
+            JEYSON__THROW(error(errc::invalid_argument));
 
-    *result = (json_is_true(j) != 0);
-    return true;
+        return false;
+    }
+
+    if (!json_is_integer(j)) {
+        if (success)
+            *success = false;
+        else
+            JEYSON__THROW(error(errc::incopatible_type));
+
+        return false;
+    }
+
+    auto result = static_cast<std::intmax_t>(json_integer_value(j));
+
+    if (result < min || result > max) {
+        if (success)
+            *success = false;
+        else
+            JEYSON__THROW(error(errc::overflow));
+
+        result = 0;
+    }
+
+    return result;
 }
 
-bool get (json_t * j, std::intmax_t * result
-    , std::intmax_t min, std::intmax_t max) noexcept
+double get (json_t * j, double min, double max, bool * success) noexcept
 {
-    if (! j)
+    if (success)
+        *success = true;
+
+    if (! j) {
+        if (success)
+            *success = false;
+        else
+            JEYSON__THROW(error(errc::invalid_argument));
+
         return false;
+    }
 
-    if (!json_is_integer(j))
+    if (!json_is_real(j)) {
+        if (success)
+            *success = false;
+        else
+            JEYSON__THROW(error(errc::incopatible_type));
+
         return false;
+    }
 
-    *result = static_cast<std::intmax_t>(json_integer_value(j));
+    auto result = static_cast<double>(json_real_value(j));
 
-    // JEYSON__THROW(error(errc::overflow));
-    if (*result < min || *result > max)
-        return false;
+    if (result < min || result > max) {
+        if (success)
+            *success = false;
+        else
+            JEYSON__THROW(error(errc::overflow));
 
-    return true;
-}
+        result = 0;
+    }
 
-bool get (json_t * j, double * result, double min, double max) noexcept
-{
-    if (! j)
-        return false;
-
-    if (!json_is_real(j))
-        return false;
-
-    *result = static_cast<double>(json_real_value(j));
-
-    // JEYSON__THROW(error(errc::overflow));
-    if (*result < min || *result > max)
-        return false;
-
-    return true;
+    return result;
 }
 
 } // details
 
 template <>
-pfs::optional<bool>
-get<bool, jansson_backend> (json<jansson_backend> const & j) noexcept
+bool
+get<bool, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
 {
-    bool result;
-    return details::get(j._d.ptr, & result)
-        ? pfs::optional<bool>{result} : pfs::nullopt;
+    if (success)
+        *success = true;
+
+    if (! j._d.ptr) {
+        if (success)
+            *success = false;
+        else
+            JEYSON__THROW(error(errc::invalid_argument));
+
+        return false;
+    }
+
+    if (!json_is_boolean(j._d.ptr)) {
+        if (success)
+            *success = false;
+        else
+            JEYSON__THROW(error(errc::incopatible_type));
+
+        return false;
+    }
+
+    return static_cast<bool>(json_is_true(j._d.ptr));
 }
 
 template <>
-pfs::optional<long long>
-get<long long, jansson_backend> (json<jansson_backend> const & j) noexcept
+long long
+get<long long, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
 {
-    std::intmax_t result;
-    return details::get(j._d.ptr, & result
-            , std::numeric_limits<long long>::min()
-            , std::numeric_limits<long long>::max())
-        ? pfs::optional<long long>{static_cast<long long>(result)} : pfs::nullopt;
+    return static_cast<long long>(details::get(j._d.ptr
+        , static_cast<std::intmax_t>(std::numeric_limits<long long>::min())
+        , static_cast<std::intmax_t>(std::numeric_limits<long long>::max())
+        , success));
 }
 
 template <>
-pfs::optional<unsigned long long>
-get<unsigned long long, jansson_backend> (json<jansson_backend> const & j) noexcept
+unsigned long long
+get<unsigned long long, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
 {
-    std::intmax_t result;
-    return details::get(j._d.ptr, & result
-            , std::numeric_limits<unsigned long long>::min()
-            , std::numeric_limits<unsigned long long>::max())
-        ? pfs::optional<unsigned long long>{static_cast<unsigned long long>(result)}
-        : pfs::nullopt;
+    return static_cast<unsigned long long>(details::get(j._d.ptr
+        , static_cast<std::intmax_t>(std::numeric_limits<long long>::min())
+        , static_cast<std::intmax_t>(std::numeric_limits<long long>::max())
+        , success));
 }
 
 template <>
-pfs::optional<long>
-get<long, jansson_backend> (json<jansson_backend> const & j) noexcept
+long
+get<long, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
 {
-    std::intmax_t result;
-    return details::get(j._d.ptr, & result
-            , std::numeric_limits<long>::min()
-            , std::numeric_limits<long>::max())
-        ? pfs::optional<long>{static_cast<long>(result)} : pfs::nullopt;
+    return static_cast<long>(details::get(j._d.ptr
+        , static_cast<std::intmax_t>(std::numeric_limits<long>::min())
+        , static_cast<std::intmax_t>(std::numeric_limits<long>::max())
+        , success));
 }
 
 template <>
-pfs::optional<unsigned long>
-get<unsigned long, jansson_backend> (json<jansson_backend> const & j) noexcept
+unsigned long
+get<unsigned long, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
 {
-    std::intmax_t result;
-    return details::get(j._d.ptr, & result
-            , std::numeric_limits<unsigned long>::min()
-            , std::numeric_limits<unsigned long>::max())
-        ? pfs::optional<unsigned long>{static_cast<unsigned long>(result)}
-        : pfs::nullopt;
+    return static_cast<unsigned long>(details::get(j._d.ptr
+        , static_cast<std::intmax_t>(std::numeric_limits<long>::min())
+        , static_cast<std::intmax_t>(std::numeric_limits<long>::max())
+        , success));
 }
 
 template <>
-pfs::optional<int>
-get<int, jansson_backend> (json<jansson_backend> const & j) noexcept
+int
+get<int, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
 {
-    std::intmax_t result;
-    return details::get(j._d.ptr, & result
-            , std::numeric_limits<int>::min()
-            , std::numeric_limits<int>::max())
-        ? pfs::optional<int>{static_cast<int>(result)} : pfs::nullopt;
+    return static_cast<int>(details::get(j._d.ptr
+        , static_cast<std::intmax_t>(std::numeric_limits<int>::min())
+        , static_cast<std::intmax_t>(std::numeric_limits<int>::max())
+        , success));
 }
 
 template <>
-pfs::optional<unsigned int>
-get<unsigned int, jansson_backend> (json<jansson_backend> const & j) noexcept
+unsigned int
+get<unsigned int, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
 {
-    std::intmax_t result;
-    return details::get(j._d.ptr, & result
-            , std::numeric_limits<unsigned int>::min()
-            , std::numeric_limits<unsigned int>::max())
-        ? pfs::optional<unsigned int>{static_cast<unsigned int>(result)}
-        : pfs::nullopt;
+    return static_cast<unsigned int>(details::get(j._d.ptr
+        , static_cast<std::intmax_t>(std::numeric_limits<int>::min())
+        , static_cast<std::intmax_t>(std::numeric_limits<int>::max())
+        , success));
 }
 
 template <>
-pfs::optional<short>
-get<short, jansson_backend> (json<jansson_backend> const & j) noexcept
+short
+get<short, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
 {
-    std::intmax_t result;
-    return details::get(j._d.ptr, & result
-            , std::numeric_limits<short>::min()
-            , std::numeric_limits<short>::max())
-        ? pfs::optional<short>{static_cast<short>(result)} : pfs::nullopt;
+    return static_cast<short>(details::get(j._d.ptr
+        , static_cast<std::intmax_t>(std::numeric_limits<short>::min())
+        , static_cast<std::intmax_t>(std::numeric_limits<short>::max())
+        , success));
 }
 
 template <>
-pfs::optional<unsigned short>
-get<unsigned short, jansson_backend> (json<jansson_backend> const & j) noexcept
+unsigned short
+get<unsigned short, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
 {
-    std::intmax_t result;
-    return details::get(j._d.ptr, & result
-            , std::numeric_limits<unsigned short>::min()
-            , std::numeric_limits<unsigned short>::max())
-        ? pfs::optional<unsigned short>{static_cast<unsigned short>(result)}
-        : pfs::nullopt;
+    return static_cast<unsigned short>(details::get(j._d.ptr
+        , static_cast<std::intmax_t>(std::numeric_limits<short>::min())
+        , static_cast<std::intmax_t>(std::numeric_limits<short>::max())
+        , success));
 }
 
 template <>
-pfs::optional<char>
-get<char, jansson_backend> (json<jansson_backend> const & j) noexcept
+char
+get<char, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
 {
-    std::intmax_t result;
-    return details::get(j._d.ptr, & result
-            , std::numeric_limits<char>::min()
-            , std::numeric_limits<char>::max())
-        ? pfs::optional<char>{static_cast<char>(result)} : pfs::nullopt;
+    return static_cast<char>(details::get(j._d.ptr
+        , static_cast<std::intmax_t>(std::numeric_limits<char>::min())
+        , static_cast<std::intmax_t>(std::numeric_limits<char>::max())
+        , success));
 }
 
 template <>
-pfs::optional<signed char>
-get<signed char, jansson_backend> (json<jansson_backend> const & j) noexcept
+signed char
+get<signed char, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
 {
-    std::intmax_t result;
-    return details::get(j._d.ptr, & result
-            , std::numeric_limits<signed char>::min()
-            , std::numeric_limits<signed char>::max())
-        ? pfs::optional<signed char>{static_cast<signed char>(result)} : pfs::nullopt;
+    return static_cast<signed char>(details::get(j._d.ptr
+        , static_cast<std::intmax_t>(std::numeric_limits<signed char>::min())
+        , static_cast<std::intmax_t>(std::numeric_limits<signed char>::max())
+        , success));
 }
 
 template <>
-pfs::optional<unsigned char>
-get<unsigned char, jansson_backend> (json<jansson_backend> const & j) noexcept
+unsigned char
+get<unsigned char, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
 {
-    std::intmax_t result;
-    return details::get(j._d.ptr, & result
-            , std::numeric_limits<unsigned char>::min()
-            , std::numeric_limits<unsigned char>::max())
-        ? pfs::optional<unsigned char>{static_cast<unsigned char>(result)}
-        : pfs::nullopt;
+    return static_cast<unsigned char>(details::get(j._d.ptr
+        , static_cast<std::intmax_t>(std::numeric_limits<signed char>::min())
+        , static_cast<std::intmax_t>(std::numeric_limits<signed char>::max())
+        , success));
 }
 
 template <>
-pfs::optional<double>
-get<double, jansson_backend> (json<jansson_backend> const & j) noexcept
+double
+get<double, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
 {
-    double result;
-    return details::get(j._d.ptr, & result
-            , std::numeric_limits<double>::min()
-            , std::numeric_limits<double>::max())
-        ? pfs::optional<double>{result} : pfs::nullopt;
+    return details::get(j._d.ptr
+        , std::numeric_limits<double>::min()
+        , std::numeric_limits<double>::max()
+        , success);
 }
 
 template <>
-pfs::optional<float>
-get<float, jansson_backend> (json<jansson_backend> const & j) noexcept
+float
+get<float, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
 {
-    double result;
-    return details::get(j._d.ptr, & result
-            , std::numeric_limits<float>::min()
-            , std::numeric_limits<float>::max())
-        ? pfs::optional<float>{static_cast<float>(result)} : pfs::nullopt;
+    return static_cast<float>(details::get(j._d.ptr
+        , static_cast<double>(std::numeric_limits<float>::min())
+        , static_cast<double>(std::numeric_limits<float>::max())
+        , success));
 }
 
 template <>
-pfs::optional<std::string>
-get<std::string, jansson_backend> (json<jansson_backend> const & j) noexcept
+std::string
+get<std::string, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
 {
-    if (!j._d.ptr)
-        return pfs::nullopt;
+    if (success)
+        *success = true;
 
-    if (!json_is_string(j._d.ptr))
-        return pfs::nullopt;
+    if (!j._d.ptr) {
+        if (success)
+            *success = false;
+        else
+            JEYSON__THROW(error(errc::invalid_argument));
+
+        return std::string{};
+    }
+
+    if (!json_is_string(j._d.ptr)) {
+        if (success)
+            *success = false;
+        else
+            JEYSON__THROW(error(errc::incopatible_type));
+
+        return std::string{};
+    }
 
     return std::string(json_string_value(j._d.ptr), json_string_length(j._d.ptr));
 }
@@ -627,16 +672,22 @@ json<jansson_backend>::size () const noexcept
 ////////////////////////////////////////////////////////////////////////////////
 template <>
 void
-json<jansson_backend>::push_back (json && value)
+json<jansson_backend>::push_back (json && value, error * perr)
 {
-    if (!value)
-        JEYSON__THROW(error(errc::invalid_argument));
+    if (!value) {
+        error err {errc::invalid_argument};
+        if (perr) *perr = err; else JEYSON__THROW(err);
+        return;
+    }
 
     if (!_d.ptr)
         _d.ptr = json_array();
 
-    if (!is_array(*this))
-        JEYSON__THROW(error(errc::incopatible_type));
+    if (!is_array(*this)) {
+        error err {errc::incopatible_type};
+        if (perr) *perr = err; else JEYSON__THROW(err);
+        return;
+    }
 
     auto rc = json_array_append_new(_d.ptr, value._d.ptr);
 
@@ -647,16 +698,22 @@ json<jansson_backend>::push_back (json && value)
 
 template <>
 void
-json<jansson_backend>::push_back (json const & value)
+json<jansson_backend>::push_back (json const & value, error * perr)
 {
-    if (!value)
-        JEYSON__THROW(error(errc::invalid_argument));
+    if (!value) {
+        error err {errc::invalid_argument};
+        if (perr) *perr = err; else JEYSON__THROW(err);
+        return;
+    }
 
     if (!_d.ptr)
         _d.ptr = json_array();
 
-    if (!is_array(*this))
-        JEYSON__THROW(error(errc::incopatible_type));
+    if (!is_array(*this)) {
+        error err {errc::incopatible_type};
+        if (perr) *perr = err; else JEYSON__THROW(err);
+        return;
+    }
 
     json j{rep_type{json_deep_copy(value._d.ptr)}};
 
@@ -705,19 +762,17 @@ std::string to_string (json<jansson_backend> const & j) noexcept
 
 template <>
 json<jansson_backend>
-json<jansson_backend>::parse (std::string const & source, error * err) noexcept
+json<jansson_backend>::parse (std::string const & source, error * perr) noexcept
 {
     json_error_t jerror;
 
     auto j = json_loads(source.c_str(), 0, & jerror);
 
     if (!j) {
-        if (err) {
-            *err = error{errc::backend_error
-                , fmt::format("parse error at line {}", jerror.line)
-                , jerror.text};
-        }
-
+        error err{errc::backend_error
+            , fmt::format("parse error at line {}", jerror.line)
+            , jerror.text};
+        if (perr) *perr = err; else JEYSON__THROW(err);
         return json<jansson_backend>{};
     }
 
@@ -726,7 +781,7 @@ json<jansson_backend>::parse (std::string const & source, error * err) noexcept
 
 template <>
 json<jansson_backend>
-json<jansson_backend>::parse (pfs::filesystem::path const & path, error * err) noexcept
+json<jansson_backend>::parse (pfs::filesystem::path const & path, error * perr) noexcept
 {
     json_error_t jerror;
 
@@ -737,13 +792,13 @@ json<jansson_backend>::parse (pfs::filesystem::path const & path, error * err) n
         , & jerror);
 
     if (!j) {
-        if (err) {
-            *err = error{errc::backend_error
-                , fmt::format("parse error at line {} in file {}"
-                    , jerror.line
-                    , pfs::filesystem::utf8_encode(path))
-                , jerror.text};
-        }
+        error err{errc::backend_error
+            , fmt::format("parse error at line {} in file {}"
+                , jerror.line
+                , pfs::filesystem::utf8_encode(path))
+            , jerror.text};
+
+        if (perr) *perr = err; else JEYSON__THROW(err);
 
         return json<jansson_backend>{};
     }
