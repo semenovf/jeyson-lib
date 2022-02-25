@@ -9,7 +9,7 @@
 cmake_minimum_required (VERSION 3.11)
 project(jeyson-lib C CXX)
 
-option(JEYSON__ENABLE_JANSSON "Enable `Jansson` library for JSON support" OFF)
+option(JEYSON__ENABLE_JANSSON "Enable `Jansson` library for JSON support" ON)
 
 if (NOT TARGET pfs::common)
     portable_target(INCLUDE_PROJECT

@@ -8,6 +8,7 @@
 ################################################################################
 cmake_minimum_required (VERSION 3.11)
 
+set(JANSSON_BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries")
 set(JANSSON_BUILD_DOCS    OFF CACHE BOOL "Disable build Jansson docs")
 set(JANSSON_EXAMPLES      OFF CACHE BOOL "Disable compile example applications")
 set(JANSSON_COVERAGE      OFF CACHE BOOL "Disable coverage support")
