@@ -217,7 +217,7 @@ json<jansson_backend> & json<jansson_backend>::operator = (json && other)
 }
 
 template <>
-inline json<jansson_backend>::operator bool () const noexcept
+json<jansson_backend>::operator bool () const noexcept
 {
     return _d.ptr != nullptr;
 }
