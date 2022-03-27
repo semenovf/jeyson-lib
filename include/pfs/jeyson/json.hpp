@@ -157,7 +157,7 @@ public:
      *
      */
     template <typename T, typename U>
-    friend T get (json<U> const & j, bool * success) noexcept;
+    friend T get (json<U> const & j, bool * success);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Capacity
@@ -250,12 +250,12 @@ public:
     /**
      * Decodes JSON from string
      */
-    static json parse (std::string const & source, error * perr = nullptr) noexcept;
+    static json parse (std::string const & source, error * perr = nullptr);
 
     /**
      * Decodes JSON from file
      */
-    static json parse (pfs::filesystem::path const & path, error * perr = nullptr) noexcept;
+    static json parse (pfs::filesystem::path const & path, error * perr = nullptr);
 };
 
 template <typename Backend>
@@ -302,10 +302,10 @@ inline bool is_structured (json<Backend> const & j) noexcept
 }
 
 template <typename T, typename Backend>
-T get (json<Backend> const & j, bool * success = nullptr) noexcept;
+T get (json<Backend> const & j, bool * success = nullptr);
 
 template <typename T, typename Backend>
-inline T get_or (json<Backend> const & j, T const & default_value) noexcept
+inline T get_or (json<Backend> const & j, T const & default_value)
 {
     bool success = true;
     auto result = get<T, Backend>(j, & success);

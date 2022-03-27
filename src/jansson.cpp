@@ -339,7 +339,7 @@ namespace details {
 
 std::intmax_t get (json_t * j
     , std::intmax_t min, std::intmax_t max
-    , bool * success) noexcept
+    , bool * success)
 {
     if (success)
         *success = true;
@@ -376,7 +376,7 @@ std::intmax_t get (json_t * j
     return result;
 }
 
-double get (json_t * j, double min, double max, bool * success) noexcept
+double get (json_t * j, double min, double max, bool * success)
 {
     if (success)
         *success = true;
@@ -417,7 +417,7 @@ double get (json_t * j, double min, double max, bool * success) noexcept
 
 template <>
 bool
-get<bool, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
+get<bool, jansson_backend> (json<jansson_backend> const & j, bool * success)
 {
     if (success)
         *success = true;
@@ -445,7 +445,7 @@ get<bool, jansson_backend> (json<jansson_backend> const & j, bool * success) noe
 
 template <>
 long long
-get<long long, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
+get<long long, jansson_backend> (json<jansson_backend> const & j, bool * success)
 {
     return static_cast<long long>(details::get(j._d.ptr
         , static_cast<std::intmax_t>(std::numeric_limits<long long>::min())
@@ -455,7 +455,7 @@ get<long long, jansson_backend> (json<jansson_backend> const & j, bool * success
 
 template <>
 unsigned long long
-get<unsigned long long, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
+get<unsigned long long, jansson_backend> (json<jansson_backend> const & j, bool * success)
 {
     return static_cast<unsigned long long>(details::get(j._d.ptr
         , static_cast<std::intmax_t>(std::numeric_limits<long long>::min())
@@ -465,7 +465,7 @@ get<unsigned long long, jansson_backend> (json<jansson_backend> const & j, bool 
 
 template <>
 long
-get<long, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
+get<long, jansson_backend> (json<jansson_backend> const & j, bool * success)
 {
     return static_cast<long>(details::get(j._d.ptr
         , static_cast<std::intmax_t>(std::numeric_limits<long>::min())
@@ -475,7 +475,7 @@ get<long, jansson_backend> (json<jansson_backend> const & j, bool * success) noe
 
 template <>
 unsigned long
-get<unsigned long, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
+get<unsigned long, jansson_backend> (json<jansson_backend> const & j, bool * success)
 {
     return static_cast<unsigned long>(details::get(j._d.ptr
         , static_cast<std::intmax_t>(std::numeric_limits<long>::min())
@@ -485,7 +485,7 @@ get<unsigned long, jansson_backend> (json<jansson_backend> const & j, bool * suc
 
 template <>
 int
-get<int, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
+get<int, jansson_backend> (json<jansson_backend> const & j, bool * success)
 {
     return static_cast<int>(details::get(j._d.ptr
         , static_cast<std::intmax_t>(std::numeric_limits<int>::min())
@@ -495,7 +495,7 @@ get<int, jansson_backend> (json<jansson_backend> const & j, bool * success) noex
 
 template <>
 unsigned int
-get<unsigned int, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
+get<unsigned int, jansson_backend> (json<jansson_backend> const & j, bool * success)
 {
     return static_cast<unsigned int>(details::get(j._d.ptr
         , static_cast<std::intmax_t>(std::numeric_limits<int>::min())
@@ -505,7 +505,7 @@ get<unsigned int, jansson_backend> (json<jansson_backend> const & j, bool * succ
 
 template <>
 short
-get<short, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
+get<short, jansson_backend> (json<jansson_backend> const & j, bool * success)
 {
     return static_cast<short>(details::get(j._d.ptr
         , static_cast<std::intmax_t>(std::numeric_limits<short>::min())
@@ -515,7 +515,7 @@ get<short, jansson_backend> (json<jansson_backend> const & j, bool * success) no
 
 template <>
 unsigned short
-get<unsigned short, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
+get<unsigned short, jansson_backend> (json<jansson_backend> const & j, bool * success)
 {
     return static_cast<unsigned short>(details::get(j._d.ptr
         , static_cast<std::intmax_t>(std::numeric_limits<short>::min())
@@ -525,7 +525,7 @@ get<unsigned short, jansson_backend> (json<jansson_backend> const & j, bool * su
 
 template <>
 char
-get<char, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
+get<char, jansson_backend> (json<jansson_backend> const & j, bool * success)
 {
     return static_cast<char>(details::get(j._d.ptr
         , static_cast<std::intmax_t>(std::numeric_limits<char>::min())
@@ -535,7 +535,7 @@ get<char, jansson_backend> (json<jansson_backend> const & j, bool * success) noe
 
 template <>
 signed char
-get<signed char, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
+get<signed char, jansson_backend> (json<jansson_backend> const & j, bool * success)
 {
     return static_cast<signed char>(details::get(j._d.ptr
         , static_cast<std::intmax_t>(std::numeric_limits<signed char>::min())
@@ -545,7 +545,7 @@ get<signed char, jansson_backend> (json<jansson_backend> const & j, bool * succe
 
 template <>
 unsigned char
-get<unsigned char, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
+get<unsigned char, jansson_backend> (json<jansson_backend> const & j, bool * success)
 {
     return static_cast<unsigned char>(details::get(j._d.ptr
         , static_cast<std::intmax_t>(std::numeric_limits<signed char>::min())
@@ -555,7 +555,7 @@ get<unsigned char, jansson_backend> (json<jansson_backend> const & j, bool * suc
 
 template <>
 double
-get<double, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
+get<double, jansson_backend> (json<jansson_backend> const & j, bool * success)
 {
     return details::get(j._d.ptr
         , std::numeric_limits<double>::min()
@@ -565,7 +565,7 @@ get<double, jansson_backend> (json<jansson_backend> const & j, bool * success) n
 
 template <>
 float
-get<float, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
+get<float, jansson_backend> (json<jansson_backend> const & j, bool * success)
 {
     return static_cast<float>(details::get(j._d.ptr
         , static_cast<double>(std::numeric_limits<float>::min())
@@ -575,7 +575,7 @@ get<float, jansson_backend> (json<jansson_backend> const & j, bool * success) no
 
 template <>
 std::string
-get<std::string, jansson_backend> (json<jansson_backend> const & j, bool * success) noexcept
+get<std::string, jansson_backend> (json<jansson_backend> const & j, bool * success)
 {
     if (success)
         *success = true;
@@ -762,7 +762,7 @@ std::string to_string (json<jansson_backend> const & j) noexcept
 
 template <>
 json<jansson_backend>
-json<jansson_backend>::parse (std::string const & source, error * perr) noexcept
+json<jansson_backend>::parse (std::string const & source, error * perr)
 {
     json_error_t jerror;
 
@@ -781,7 +781,7 @@ json<jansson_backend>::parse (std::string const & source, error * perr) noexcept
 
 template <>
 json<jansson_backend>
-json<jansson_backend>::parse (pfs::filesystem::path const & path, error * perr) noexcept
+json<jansson_backend>::parse (pfs::filesystem::path const & path, error * perr)
 {
     json_error_t jerror;
 
