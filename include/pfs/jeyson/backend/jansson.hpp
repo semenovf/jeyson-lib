@@ -46,6 +46,7 @@ struct jansson_backend
         rep_type (json_t * p);
         rep_type (json_t * p, json_t * parent, size_type index);
         rep_type (json_t * p, json_t * parent, std::string const & key);
+        ~rep_type ();
     };
 };
 

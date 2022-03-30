@@ -23,15 +23,20 @@ static_assert(std::numeric_limits<std::intmax_t>::max()
 jansson_backend::rep_type::rep_type () = default;
 
 jansson_backend::rep_type::rep_type (rep_type const & other)
-    : ptr(other.ptr)
-    , refdata(other.refdata)
-{}
+{
+    if (other.ptr) {
+        ptr = json_deep_copy(other.ptr);
+        refdata = other.refdata;
+    }
+}
 
 jansson_backend::rep_type::rep_type (rep_type && other)
-    : ptr(other.ptr)
-    , refdata(std::move(other.refdata))
 {
-    other.ptr = nullptr;
+    if (other.ptr) {
+        ptr = other.ptr;
+        refdata = std::move(other.refdata);
+        other.ptr = nullptr;
+    }
 }
 
 jansson_backend::rep_type::rep_type (json_t * p)
@@ -52,6 +57,14 @@ jansson_backend::rep_type::rep_type (json_t * p, json_t * parent, std::string co
     refdata = std::make_shared<refdata_type>();
     refdata->parent = parent;
     refdata->index.key = key;
+}
+
+jansson_backend::rep_type::~rep_type ()
+{
+    if (ptr && !refdata)
+        json_decref(ptr);
+
+    ptr = nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -111,29 +124,13 @@ json<jansson_backend>::json (char const * value, std::size_t n)
 {}
 
 template <>
-json<jansson_backend>::json (json const & other)
-    : _d()
-{
-    if (other._d.ptr)
-        _d.ptr = json_deep_copy(other._d.ptr);
-}
+json<jansson_backend>::json (json const & other) = default;
 
 template <>
-json<jansson_backend>::json (json && other)
-{
-    if (other._d.ptr) {
-        _d.ptr = other._d.ptr;
-        _d.refdata = std::move(other._d.refdata);
-        other._d.ptr = nullptr;
-    }
-}
+json<jansson_backend>::json (json && other) = default;
 
 template <>
-json<jansson_backend>::~json ()
-{
-    if (_d.ptr && !_d.refdata)
-        json_decref(_d.ptr);
-}
+json<jansson_backend>::~json () = default;
 
 template <>
 json<jansson_backend> & json<jansson_backend>::operator = (json const & other)
@@ -142,8 +139,9 @@ json<jansson_backend> & json<jansson_backend>::operator = (json const & other)
         if (_d.ptr != other._d.ptr) {
             // Reference
             if (_d.refdata) {
-                assert(_d.refdata->parent);
-                assert(json_is_array(_d.refdata->parent) || json_is_object(_d.refdata->parent));
+                JEYSON__ASSERT(_d.refdata->parent, "");
+                JEYSON__ASSERT(json_is_array(_d.refdata->parent)
+                    || json_is_object(_d.refdata->parent), "");
 
                 if (json_is_array(_d.refdata->parent)) {
                     auto rc = json_array_set(_d.refdata->parent
@@ -181,8 +179,9 @@ json<jansson_backend> & json<jansson_backend>::operator = (json && other)
         if (_d.ptr != other._d.ptr) {
             // Reference
             if (_d.refdata) {
-                assert(_d.refdata->parent);
-                assert(json_is_array(_d.refdata->parent) || json_is_object(_d.refdata->parent));
+                JEYSON__ASSERT(_d.refdata->parent, "");
+                JEYSON__ASSERT(json_is_array(_d.refdata->parent)
+                    || json_is_object(_d.refdata->parent), "");
 
                 if (json_is_array(_d.refdata->parent)) {
                     auto rc = json_array_set(_d.refdata->parent
@@ -190,7 +189,8 @@ json<jansson_backend> & json<jansson_backend>::operator = (json && other)
                         , other._d.ptr);
 
                     if (rc != 0) {
-                        JEYSON__THROW((error{errc::backend_error, "update array element failure"}));
+                        JEYSON__THROW((error{errc::backend_error
+                            , "update array element failure"}));
                     }
                 } else {
                     auto rc = json_object_setn(_d.refdata->parent
@@ -199,7 +199,8 @@ json<jansson_backend> & json<jansson_backend>::operator = (json && other)
                         , other._d.ptr);
 
                     if (rc != 0) {
-                        JEYSON__THROW((error{errc::backend_error, "update object element failure"}));
+                        JEYSON__THROW((error{errc::backend_error
+                            , "update object element failure"}));
                     }
                 }
 
