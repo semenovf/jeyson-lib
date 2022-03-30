@@ -10,6 +10,7 @@
 #include "pfs/jeyson/error.hpp"
 #include "pfs/filesystem.hpp"
 #include "pfs/optional.hpp"
+#include <functional>
 #include <string>
 #include <type_traits>
 #include <cstddef>
@@ -37,6 +38,9 @@ private:
 private:
     json (rep_type const & rep);
     json (rep_type && rep);
+
+public:
+    static std::function<void(error)> failure;
 
 public:
 ////////////////////////////////////////////////////////////////////////////////
@@ -188,7 +192,7 @@ public:
      *         and it is not an error.
      * @throws @c error { @c errc::invalid_argument } if @a value is uninitialized.
      */
-    void push_back (json const & value, error * perr = nullptr);
+    void push_back (json const & value);
 
     /**
      * Appends the given element @a value to the end of the array.
@@ -198,7 +202,7 @@ public:
      *         and it is not an error.
      * @throws @c error { @c errc::invalid_argument } if @a value is uninitialized.
      */
-    void push_back (json && value, error * perr = nullptr);
+    void push_back (json && value);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Comparison operators
@@ -250,12 +254,12 @@ public:
     /**
      * Decodes JSON from string
      */
-    static json parse (std::string const & source, error * perr = nullptr);
+    static json parse (std::string const & source);
 
     /**
      * Decodes JSON from file
      */
-    static json parse (pfs::filesystem::path const & path, error * perr = nullptr);
+    static json parse (pfs::filesystem::path const & path);
 };
 
 template <typename Backend>

@@ -58,6 +58,9 @@ jansson_backend::rep_type::rep_type (json_t * p, json_t * parent, std::string co
 // Constructors, destructors, assignment operators
 ////////////////////////////////////////////////////////////////////////////////
 template <>
+std::function<void(error)> json<jansson_backend>::failure = [] (error) {};
+
+template <>
 json<jansson_backend>::json (jansson_backend::rep_type const & rep)
     : _d(rep)
 {}
@@ -672,11 +675,11 @@ json<jansson_backend>::size () const noexcept
 ////////////////////////////////////////////////////////////////////////////////
 template <>
 void
-json<jansson_backend>::push_back (json && value, error * perr)
+json<jansson_backend>::push_back (json && value)
 {
     if (!value) {
         error err {errc::invalid_argument};
-        if (perr) *perr = err; else JEYSON__THROW(err);
+        JEYSON__THROW(err);
         return;
     }
 
@@ -685,7 +688,7 @@ json<jansson_backend>::push_back (json && value, error * perr)
 
     if (!is_array(*this)) {
         error err {errc::incopatible_type};
-        if (perr) *perr = err; else JEYSON__THROW(err);
+        JEYSON__THROW(err);
         return;
     }
 
@@ -698,11 +701,11 @@ json<jansson_backend>::push_back (json && value, error * perr)
 
 template <>
 void
-json<jansson_backend>::push_back (json const & value, error * perr)
+json<jansson_backend>::push_back (json const & value)
 {
     if (!value) {
         error err {errc::invalid_argument};
-        if (perr) *perr = err; else JEYSON__THROW(err);
+        JEYSON__THROW(err);
         return;
     }
 
@@ -711,7 +714,7 @@ json<jansson_backend>::push_back (json const & value, error * perr)
 
     if (!is_array(*this)) {
         error err {errc::incopatible_type};
-        if (perr) *perr = err; else JEYSON__THROW(err);
+        JEYSON__THROW(err);
         return;
     }
 
@@ -762,7 +765,7 @@ std::string to_string (json<jansson_backend> const & j) noexcept
 
 template <>
 json<jansson_backend>
-json<jansson_backend>::parse (std::string const & source, error * perr)
+json<jansson_backend>::parse (std::string const & source)
 {
     json_error_t jerror;
 
@@ -772,7 +775,7 @@ json<jansson_backend>::parse (std::string const & source, error * perr)
         error err{errc::backend_error
             , fmt::format("parse error at line {}", jerror.line)
             , jerror.text};
-        if (perr) *perr = err; else JEYSON__THROW(err);
+        failure(err);
         return json<jansson_backend>{};
     }
 
@@ -781,7 +784,7 @@ json<jansson_backend>::parse (std::string const & source, error * perr)
 
 template <>
 json<jansson_backend>
-json<jansson_backend>::parse (pfs::filesystem::path const & path, error * perr)
+json<jansson_backend>::parse (pfs::filesystem::path const & path)
 {
     json_error_t jerror;
 
@@ -797,9 +800,7 @@ json<jansson_backend>::parse (pfs::filesystem::path const & path, error * perr)
                 , jerror.line
                 , pfs::filesystem::utf8_encode(path))
             , jerror.text};
-
-        if (perr) *perr = err; else JEYSON__THROW(err);
-
+        failure(err);
         return json<jansson_backend>{};
     }
 

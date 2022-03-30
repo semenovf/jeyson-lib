@@ -8,6 +8,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
+#include "pfs/fmt.hpp"
 #include "pfs/jeyson/json.hpp"
 #include "pfs/jeyson/backend/jansson.hpp"
 
@@ -15,6 +16,10 @@ template <typename Backend>
 void run_tests ()
 {
     using json = jeyson::json<Backend>;
+
+    json::failure = [] (jeyson::error err) {
+        fmt::print(stderr, "ERROR: {}\n", err.what());
+    };
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constructors
