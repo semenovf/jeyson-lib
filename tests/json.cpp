@@ -11,6 +11,8 @@
 #include "pfs/fmt.hpp"
 #include "pfs/jeyson/json.hpp"
 #include "pfs/jeyson/backend/jansson.hpp"
+#include "pfs/optional.hpp"
+#include <vector>
 
 template <typename Backend>
 void run_tests ()
@@ -366,6 +368,47 @@ void run_tests ()
     }
 }
 
+template <typename Backend>
+void run_custom_test ()
+{
+    using json = jeyson::json<Backend>;
+
+    json::failure = [] (jeyson::error err) {
+        fmt::print(stderr, "ERROR: {}\n", err.what());
+    };
+
+    struct A {
+        std::vector<pfs::optional<json>> v;
+    };
+
+    struct B {
+        A d;
+    };
+
+    B b1;
+    b1.d.v.push_back(json{42});
+    b1.d.v.push_back(json{"abc"});
+
+    REQUIRE_FALSE(b1.d.v.empty());
+    REQUIRE_EQ(b1.d.v.size(), 2);
+    REQUIRE(is_integer(*b1.d.v[0]));
+    REQUIRE_EQ(jeyson::get<int>(*b1.d.v[0]), 42);
+
+    B b2;
+    b2.d.v.push_back(json{43});
+    REQUIRE_FALSE(b2.d.v.empty());
+    REQUIRE_EQ(b2.d.v.size(), 1);
+    REQUIRE_EQ(jeyson::get<int>(*b2.d.v[0]), 43);
+
+    b1 = std::move(b2);
+
+    REQUIRE(b2.d.v.empty());
+    REQUIRE_FALSE(b1.d.v.empty());
+    REQUIRE_EQ(b1.d.v.size(), 1);
+    REQUIRE_EQ(jeyson::get<int>(*b1.d.v[0]), 43);
+}
+
 TEST_CASE("JSON Jansson backend") {
     run_tests<jeyson::jansson_backend>();
+    run_custom_test<jeyson::jansson_backend>();
 }
