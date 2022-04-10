@@ -94,6 +94,12 @@ public:
 
     json & operator = (json && other);
 
+    template <typename T>
+    json & operator = (T x)
+    {
+        return operator = (json{x});
+    }
+
     /// Check if JSON value is initialized.
     operator bool () const noexcept;
 
@@ -203,6 +209,21 @@ public:
      * @throws @c error { @c errc::invalid_argument } if @a value is uninitialized.
      */
     void push_back (json && value);
+
+    /**
+     * Writes the JSON representaion to the file @a path. If @a path already
+     * exists, it is overwritten.
+     *
+     * @param path Path to the file to save data.
+     * @param compact Save in compact representation.
+     * @param indent Number of spaces for indentation (ignored if @a compact
+     *        is @c true).
+     * @param precision The precision for real numbers output.
+     */
+    bool save (pfs::filesystem::path const & path
+        , bool compact = false
+        , int indent = 4
+        , int precision = 17);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Comparison operators

@@ -797,7 +797,7 @@ json<jansson_backend>::parse (pfs::filesystem::path const & path)
 
     if (!j) {
         error err{errc::backend_error
-            , fmt::format("parse error at line {} in file {}"
+            , fmt::format("parse error at line {} in file `{}`"
                 , jerror.line
                 , pfs::filesystem::utf8_encode(path))
             , jerror.text};
@@ -806,6 +806,49 @@ json<jansson_backend>::parse (pfs::filesystem::path const & path)
     }
 
     return json<jansson_backend>{json<jansson_backend>::rep_type{j}};
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Saving
+////////////////////////////////////////////////////////////////////////////////
+
+template <>
+bool json<jansson_backend>::save (pfs::filesystem::path const & path
+    , bool compact
+    , int indent
+    , int precision)
+{
+    std::size_t flags = JSON_ENCODE_ANY;
+
+    if (compact) {
+        flags |= JSON_COMPACT;
+    } else {
+        if (indent > 31)
+            indent = 31;
+
+        if (indent > 0)
+            flags |= JSON_INDENT(indent);
+    }
+
+    if (precision > 31)
+        precision = 31;
+
+    if (precision > 0)
+        flags |= JSON_REAL_PRECISION(precision);
+
+    auto result = json_dump_file(_d.ptr
+        , pfs::filesystem::utf8_encode(path).c_str()
+        , flags);
+
+    if (result < 0) {
+        error err{errc::backend_error
+            , fmt::format("save JSON representation to file `{}` failure"
+                , pfs::filesystem::utf8_encode(path))};
+        failure(err);
+        return false;
+    }
+
+    return true;
 }
 
 } // namespace jeyson
