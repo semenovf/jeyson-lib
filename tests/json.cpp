@@ -15,38 +15,34 @@
 #include <vector>
 
 template <typename Backend>
-void run_tests ()
+void run_basic_tests ()
 {
     using json = jeyson::json<Backend>;
-
-    json::failure = [] (jeyson::error err) {
-        fmt::print(stderr, "ERROR: {}\n", err.what());
-    };
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constructors
 ////////////////////////////////////////////////////////////////////////////////
     {
         json j;
-        REQUIRE_FALSE(!!j);
+        CHECK_FALSE(j);
     }
 
     {
         json j {nullptr};
-        REQUIRE(!!j);
-        REQUIRE(is_null(j));
+        CHECK(j);
+        CHECK(is_null(j));
     }
 
     {
         json j {true};
-        REQUIRE(!!j);
-        REQUIRE(is_bool(j));
+        CHECK(j);
+        CHECK(is_bool(j));
     }
 
     {
         json j {false};
-        REQUIRE(!!j);
-        REQUIRE(is_bool(j));
+        CHECK(j);
+        CHECK(is_bool(j));
     }
 
     {
@@ -63,30 +59,31 @@ void run_tests ()
         json j4 {b4};
         json j5 {b5};
         json j6 {b6};
-        REQUIRE(is_bool(j1));
-        REQUIRE(is_bool(j2));
-        REQUIRE(is_bool(j3));
-        REQUIRE(is_bool(j4));
-        REQUIRE(is_bool(j5));
-        REQUIRE(is_bool(j6));
+        CHECK(is_bool(j1));
+        CHECK(is_bool(j2));
+        CHECK(is_bool(j3));
+        CHECK(is_bool(j4));
+        CHECK(is_bool(j5));
+        CHECK(is_bool(j6));
+        CHECK(is_scalar(j6));
     }
 
     {
         json j {0};
-        REQUIRE(!!j);
-        REQUIRE(is_integer(j));
+        CHECK(j);
+        CHECK(is_integer(j));
     }
 
     {
         json j {42};
-        REQUIRE(!!j);
-        REQUIRE(is_integer(j));
+        CHECK(j);
+        CHECK(is_integer(j));
     }
 
     {
         json j {-42};
-        REQUIRE(!!j);
-        REQUIRE(is_integer(j));
+        CHECK(j);
+        CHECK(is_integer(j));
     }
 
     // Constructors from integral values
@@ -104,7 +101,7 @@ void run_tests ()
             , json{std::intmax_t{42}}
             , json{std::uintmax_t{42}}
         }) {
-            REQUIRE(is_integer(j));
+            CHECK(is_integer(j));
         }
 
         uint16_t i1 = 42;
@@ -120,19 +117,20 @@ void run_tests ()
         json j4 {i4};
         json j5 {i5};
         json j6 {i6};
-        REQUIRE(is_integer(j1));
-        REQUIRE(is_integer(j2));
-        REQUIRE(is_integer(j3));
-        REQUIRE(is_integer(j4));
-        REQUIRE(is_integer(j5));
-        REQUIRE(is_integer(j6));
+        CHECK(is_integer(j1));
+        CHECK(is_integer(j2));
+        CHECK(is_integer(j3));
+        CHECK(is_integer(j4));
+        CHECK(is_integer(j5));
+        CHECK(is_integer(j6));
+        CHECK(is_scalar(j6));
     }
 
     {
         double f = 3.14;
         json j {f};
-        REQUIRE(!!j);
-        REQUIRE(is_real(j));
+        CHECK(!!j);
+        CHECK(is_real(j));
 
         float f1 = 3.14;
         float volatile f2 = f1;
@@ -147,98 +145,104 @@ void run_tests ()
         json j4 {f4};
         json j5 {f5};
         json j6 {f6};
-        REQUIRE(is_real(j1));
-        REQUIRE(is_real(j2));
-        REQUIRE(is_real(j3));
-        REQUIRE(is_real(j4));
-        REQUIRE(is_real(j5));
-        REQUIRE(is_real(j6));
+        CHECK(is_real(j1));
+        CHECK(is_real(j2));
+        CHECK(is_real(j3));
+        CHECK(is_real(j4));
+        CHECK(is_real(j5));
+        CHECK(is_real(j6));
+        CHECK(is_scalar(j6));
     }
 
     {
         json j {std::string{"Hello"}};
-        REQUIRE(!!j);
-        REQUIRE(is_string(j));
+        CHECK(!!j);
+        CHECK(is_string(j));
+        CHECK(is_scalar(j));
     }
 
     {
         json j {", World"};
-        REQUIRE(!!j);
-        REQUIRE(is_string(j));
+        CHECK(j);
+        CHECK(is_string(j));
+        CHECK(is_scalar(j));
     }
 
     {
         json j {"!", 1};
-        REQUIRE(!!j);
-        REQUIRE(is_string(j));
+        CHECK(j);
+        CHECK(is_string(j));
+        CHECK(is_scalar(j));
     }
 
+    // Construct from unitialized value
     {
         json j1;
         json j2 {j1};
 
-        REQUIRE_FALSE(!!j1);
-        REQUIRE_FALSE(!!j2);
+        CHECK_FALSE(j1);
+        CHECK_FALSE(j2);
     }
 
+    // Copy constructor
     {
         json j1 {42};
         json j2 {j1};
 
-        REQUIRE(!!j1);
-        REQUIRE(!!j2);
-        REQUIRE(is_integer(j1));
-        REQUIRE(is_integer(j2));
+        CHECK(j1);
+        CHECK(j2);
+        CHECK(is_integer(j1));
+        CHECK(is_integer(j2));
     }
 
+    // Move constructor
     {
         json j1 {42};
         json j2 {std::move(j1)};
 
-        REQUIRE_FALSE(!!j1);
-        REQUIRE(!!j2);
-        REQUIRE(is_integer(j2));
+        CHECK_FALSE(!!j1);
+        CHECK(!!j2);
+        CHECK(is_integer(j2));
     }
 
+    // Copy assignment
     {
         json j1 {42};
         json j2;
 
-        REQUIRE(!!j1);
-        REQUIRE_FALSE(!!j2);
+        CHECK(!!j1);
+        CHECK_FALSE(!!j2);
 
         j2 = j1;
-        REQUIRE(!!j1);
-        REQUIRE(!!j2);
-        REQUIRE(is_integer(j1));
-        REQUIRE(is_integer(j2));
+        CHECK(!!j1);
+        CHECK(!!j2);
+        CHECK(is_integer(j1));
+        CHECK(is_integer(j2));
     }
 
+    // Move assignment
     {
         json j1 {42};
         json j2;
 
-        REQUIRE(!!j1);
-        REQUIRE_FALSE(!!j2);
+        CHECK(!!j1);
+        CHECK_FALSE(!!j2);
 
         j2 = std::move(j1);
-        REQUIRE_FALSE(!!j1);
-        REQUIRE(!!j2);
-        REQUIRE(is_integer(j2));
+        CHECK_FALSE(!!j1);
+        CHECK(!!j2);
+        CHECK(is_integer(j2));
     }
 
+    // Custom assignment
     {
-        json j;
-        j.push_back(json{"Hello"});
-        auto ref = j[0];
+       json j;
 
-        json j1{ref};
+       CHECK_FALSE(j);
 
-        REQUIRE(is_array(j));
-        REQUIRE(is_string(ref));
-        REQUIRE(is_string(j1));
-        REQUIRE_EQ(jeyson::get<std::string>(ref), std::string{"Hello"});
-        REQUIRE_EQ(jeyson::get<std::string>(j1), std::string{"Hello"});
+       j = nullptr;
+
+       CHECK(is_null(j));
     }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -251,15 +255,88 @@ void run_tests ()
         json j2 {42};
         json j3 {43};
 
-        REQUIRE_EQ(j01, j02);
-        REQUIRE_EQ(j1 , j2);
-        REQUIRE_NE(j01, j1);
-        REQUIRE_NE(j1 , j3);
+        CHECK(j01 == j02);
+        CHECK(j1 == j2);
+        CHECK(j01 != j1);
+        CHECK(j1 != j3);
     }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Modifiers and Element access
+// Modifiers and Capacity
 ////////////////////////////////////////////////////////////////////////////////
+    {
+        json j;
+        j.insert("key1", 42);
+        j.insert("key2", 43);
+
+        CHECK_EQ(j.size(), 2);
+
+        j.insert("key3", 44);
+
+        CHECK_EQ(j.size(), 3);
+
+        // Replaced
+        j.insert("key3", 45);
+        CHECK_EQ(j.size(), 3);
+        CHECK(is_structured(j));
+    }
+
+    {
+        json j;
+
+        j.push_back(json{nullptr});
+        j.push_back(json{true});
+
+        {
+            json n {42};
+            j.push_back(n);
+        }
+
+        {
+            json f {3.14};
+            j.push_back(std::move(f));
+            CHECK_FALSE(f);
+        }
+
+        j.push_back(json{"Hello"});
+
+        REQUIRE_FALSE(j.empty());
+        REQUIRE_EQ(j.size(), 5);
+        CHECK(is_structured(j));
+    }
+
+    // Swap
+    {
+        json j1;
+        json j2{42};
+
+        CHECK(!j1);
+        CHECK(j2);
+
+        swap(j1, j2);
+
+        CHECK(j1);
+        CHECK(!j2);
+    }
+
+////////////////////////////////////////////////////////////////////////////////
+// Stringification
+////////////////////////////////////////////////////////////////////////////////
+    {
+        json j;
+        j.push_back(json{nullptr});
+        j.push_back(json{true});
+        j.push_back(json{42});
+
+        REQUIRE_EQ(to_string(j), std::string{"[null,true,42]"});
+    }
+}
+
+template <typename Backend>
+void run_access_tests ()
+{
+    using json = jeyson::json<Backend>;
+
     {
         json j;
 
@@ -276,139 +353,140 @@ void run_tests ()
             j.push_back(std::move(f));
         }
 
-        j.push_back(json{"Hello"});
+        j.push_back("Hello");
 
         REQUIRE_EQ(j.size(), 5);
 
-        REQUIRE(is_null(j[0]));
-        REQUIRE(is_bool(j[1]));
-        REQUIRE(is_integer(j[2]));
-        REQUIRE(is_real(j[3]));
-        REQUIRE(is_string(j[4]));
+        auto r1 = j[0];
 
-        REQUIRE_EQ(jeyson::get<bool>(j[1]), true);
-        REQUIRE_EQ(jeyson::get<int>(j[2]), 42);
-        REQUIRE_EQ(jeyson::get<float>(j[3]), float{3.14});
+        CHECK(r1);
+
+        CHECK(j[0].is_null());
+        CHECK(j[1].is_bool());
+        CHECK(j[2].is_integer());
+        CHECK(j[3].is_real());
+        CHECK(j[4].is_string());
+
+        auto r_new = j[j.size()];
+        CHECK(r_new);
+        CHECK(j[5].is_null());
+
+        REQUIRE_THROWS(j.at(j.size()));
+
+//         REQUIRE_EQ(jeyson::get<bool>(j[1]), true);
+//         REQUIRE_EQ(jeyson::get<int>(j[2]), 42);
+//         REQUIRE_EQ(jeyson::get<float>(j[3]), float{3.14});
     }
 
     {
         json j;
-        j["KEY1"] = json{42};
-        j["KEY2"] = json{"Hello"};
+        j.insert("null", nullptr);
+        j.insert("bool", true);
+        j.insert("int", 43);
+        j.insert("real", 3.14159);
+        j.insert("string", "hello");
 
-        REQUIRE_EQ(jeyson::get<int>(j["KEY1"]), 42);
-        REQUIRE_EQ(jeyson::get<std::string>(j["KEY2"]), std::string{"Hello"});
+        CHECK(is_object(j));
+        CHECK_EQ(j.size(), 5);
+
+        CHECK(is_null(j["null"]));
+        CHECK(is_bool(j["bool"]));
+        CHECK(is_integer(j["int"]));
+        CHECK(is_real(j["real"]));
+        CHECK(is_string(j["string"]));
     }
 
-    {
-        json j;
-        j.push_back(json{1});
-        j.push_back(json{"?"});
+//     {
+//         json j;
+//         j["KEY1"] = json{42};
+//         j["KEY2"] = json{"Hello"};
+//
+//         REQUIRE_EQ(jeyson::get<int>(j["KEY1"]), 42);
+//         REQUIRE_EQ(jeyson::get<std::string>(j["KEY2"]), std::string{"Hello"});
+//     }
 
-        REQUIRE_EQ(jeyson::get<int>(j[0]), 1);
-        REQUIRE_EQ(jeyson::get<std::string>(j[1]), std::string{"?"});
-
-        j[0] = json{42};
-        j[1] = json{"Hello"};
-
-        REQUIRE_EQ(jeyson::get<int>(j[0]), 42);
-        REQUIRE_EQ(jeyson::get<std::string>(j[1]), std::string{"Hello"});
-    }
-
-////////////////////////////////////////////////////////////////////////////////
-// Stringification
-////////////////////////////////////////////////////////////////////////////////
-    {
-        json j;
-        j.push_back(json{nullptr});
-        j.push_back(json{true});
-        j.push_back(json{42});
-
-        REQUIRE_EQ(to_string(j), std::string{"[null,true,42]"});
-    }
-
-////////////////////////////////////////////////////////////////////////////////
-// Parsing
-////////////////////////////////////////////////////////////////////////////////
-    {
-        // Good
-        {
-            std::string s {"[null,true,42]"};
-            auto j = json::parse(s);
-
-            REQUIRE(j);
-
-            REQUIRE(is_null(j[0]));
-            REQUIRE(is_bool(j[1]));
-            REQUIRE(is_integer(j[2]));
-            REQUIRE_EQ(jeyson::get<bool>(j[1]), true);
-            REQUIRE_EQ(jeyson::get<int>(j[2]), 42);
-        }
-
-        // Bad
-        {
-            std::string s {"[null"};
-            auto j = json::parse(s);
-
-            REQUIRE_FALSE(j);
-        }
-
-        {
-            auto j1 = json::parse(pfs::filesystem::utf8_decode("data/twitter.json"));
-            auto j2 = json::parse(pfs::filesystem::utf8_decode("data/canada.json"));
-            auto j3 = json::parse(pfs::filesystem::utf8_decode("data/citm_catalog.json"));
-
-            REQUIRE(j1);
-            REQUIRE(j2);
-            REQUIRE(j3);
-
-            auto code = j1["statuses"][0]["metadata"]["iso_language_code"];
-            REQUIRE_EQ(jeyson::get<std::string>(code), std::string{"ja"});
-        }
-    }
+//     {
+//         json j;
+//         j.push_back(json{1});
+//         j.push_back(json{"?"});
+//
+//         REQUIRE_EQ(jeyson::get<int>(j[0]), 1);
+//         REQUIRE_EQ(jeyson::get<std::string>(j[1]), std::string{"?"});
+//
+//         j[0] = json{42};
+//         j[1] = json{"Hello"};
+//
+//         REQUIRE_EQ(jeyson::get<int>(j[0]), 42);
+//         REQUIRE_EQ(jeyson::get<std::string>(j[1]), std::string{"Hello"});
+//     }
 }
 
 template <typename Backend>
-void run_custom_test ()
+void run_assignment_tests ()
 {
     using json = jeyson::json<Backend>;
 
-    json::failure = [] (jeyson::error err) {
-        fmt::print(stderr, "ERROR: {}\n", err.what());
-    };
+    // Assing to invalid JSON (non-initialized)
+    {
+        json j;
+        j = nullptr;
 
-    struct A {
-        std::vector<pfs::optional<json>> v;
-    };
+        CHECK(is_null(j));
 
-    struct B {
-        A d;
-    };
+        j = true;
 
-    B b1;
-    b1.d.v.push_back(json{42});
-    b1.d.v.push_back(json{"abc"});
+        CHECK(is_bool(j));
+//         CHECK_EQ(jeyson::get<bool>(j), true);
+    }
+}
 
-    REQUIRE_FALSE(b1.d.v.empty());
-    REQUIRE_EQ(b1.d.v.size(), 2);
-    REQUIRE(is_integer(*b1.d.v[0]));
-    REQUIRE_EQ(jeyson::get<int>(*b1.d.v[0]), 42);
 
-    B b2;
-    b2.d.v.push_back(json{43});
-    REQUIRE_FALSE(b2.d.v.empty());
-    REQUIRE_EQ(b2.d.v.size(), 1);
-    REQUIRE_EQ(jeyson::get<int>(*b2.d.v[0]), 43);
+template <typename Backend>
+void run_parsing_tests ()
+{
+    using json = jeyson::json<Backend>;
 
-    b1 = std::move(b2);
+    // Good
+    {
+        std::string s {"[null,true,42]"};
+        auto j = json::parse(s);
 
-    REQUIRE(b2.d.v.empty());
-    REQUIRE_FALSE(b1.d.v.empty());
-    REQUIRE_EQ(b1.d.v.size(), 1);
-    REQUIRE_EQ(jeyson::get<int>(*b1.d.v[0]), 43);
+        REQUIRE(j);
+        REQUIRE(is_array(j));
+        REQUIRE_EQ(j.size(), 3);
+
+        REQUIRE(j[0].is_null());
+        REQUIRE(j[1].is_bool());
+        REQUIRE(j[2].is_integer());
+//         REQUIRE_EQ(jeyson::get<bool>(j[1]), true);
+//         REQUIRE_EQ(jeyson::get<int>(j[2]), 42);
+    }
+
+    // Bad
+    {
+        std::string s {"[null"};
+
+        REQUIRE_THROWS(json::parse(s));
+    }
+
+    {
+        auto j1 = json::parse(pfs::filesystem::utf8_decode("data/twitter.json"));
+        auto j2 = json::parse(pfs::filesystem::utf8_decode("data/canada.json"));
+        auto j3 = json::parse(pfs::filesystem::utf8_decode("data/citm_catalog.json"));
+
+        REQUIRE(j1);
+        REQUIRE(j2);
+        REQUIRE(j3);
+
+        auto code = j1["statuses"][0]["metadata"]["iso_language_code"];
+        REQUIRE(code.is_string());
+        //REQUIRE_EQ(jeyson::get<std::string>(code), std::string{"ja"});
+    }
 }
 
 TEST_CASE("JSON Jansson backend") {
-    run_tests<jeyson::jansson_backend>();
-    run_custom_test<jeyson::jansson_backend>();
+    run_basic_tests<jeyson::backend::jansson>();
+    run_assignment_tests<jeyson::backend::jansson>();
+    run_access_tests<jeyson::backend::jansson>();
+    run_parsing_tests<jeyson::backend::jansson>();
 }

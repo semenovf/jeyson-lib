@@ -10,168 +10,134 @@
 #include "pfs/jeyson/error.hpp"
 #include "pfs/filesystem.hpp"
 #include "pfs/optional.hpp"
-#include <functional>
+#include "pfs/string_view.hpp"
 #include <string>
 #include <type_traits>
 #include <cstddef>
 #include <cstdint>
 
+#include "pfs/fmt.hpp"
+
 namespace jeyson {
 
 template <typename Backend>
-class json
+class json;
+
+template <typename Backend>
+class json_ref;
+
+////////////////////////////////////////////////////////////////////////////////
+// Traits interface
+////////////////////////////////////////////////////////////////////////////////
+template <typename Backend>
+class traits_interface
 {
 public:
-    using value_type      = json;
-    using size_type       = typename Backend::size_type;
-    using string_type     = typename Backend::string_type;
-    using key_type        = typename Backend::key_type;
-    using reference       = json;
-    using const_reference = const json;
+    //--------------------------------------------------------------------------
+    // Type quieries
+    //--------------------------------------------------------------------------
 
-private:
-    using rep_type = typename Backend::rep_type;
+    /// Check if JSON value is null.
+    bool is_null () const noexcept;
 
-private:
-    rep_type _d;
+    /// Check if JSON value is boolean.
+    bool is_bool () const noexcept;
 
-private:
-    json (rep_type const & rep);
-    json (rep_type && rep);
+    /// Check if JSON value is integer.
+    bool is_integer () const noexcept;
+
+    /// Check if JSON value is real.
+    bool is_real () const noexcept;
+
+    /// Check if JSON value is string.
+    bool is_string () const noexcept;
+
+    /// Check if JSON value is array.
+    bool is_array () const noexcept;
+
+    /// Check if JSON value is an object.
+    bool is_object () const noexcept;
+
+    /// Check if JSON value is scalar (neither an array nor an object) value.
+    bool is_scalar () const noexcept
+    {
+        return is_null() || is_bool() || is_integer()
+            || is_real() || is_string();
+    }
+
+    /// Check if JSON value is sctuctured (array or object) value.
+    bool is_structured () const noexcept
+    {
+        return is_array() || is_object();
+    }
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Modifiers interface
+////////////////////////////////////////////////////////////////////////////////
+template <typename Backend>
+class modifiers_interface
+{
+public:
+    using size_type = typename Backend::size_type;
+    using key_type = typename Backend::key_type;
 
 public:
-    static std::function<void(error)> failure;
+    /**
+     * Inserts copy of @a value into the object overriding if the object
+     * already contains an element with an equivalent key.
+     *
+     * @param key Key by which the @a value is inserted.
+     * @param value Value to be inserted.
+     *
+     * @return @c true if insertion took place, @c false otherwise.
+     *
+     * @throw @c error { @c errc::invalid_argument } if @a value is uninitialized.
+     * @throw @c error { @c errc::incopatible_type } if @c this is initialized
+     *        and it is not an object.
+     * @throw @c error { @c errc::backend_error } if backend call(s) results a failure.
+     */
+    void insert (key_type const & key, json<Backend> const & value);
+
+    /**
+     * Inserts @a value into the object overriding if the object already contains
+     * an element with an equivalent key.
+     */
+    void insert (key_type const & key, json<Backend> && value);
+
+    /**
+     * Appends the given element @a value to the end of the array.
+     * The new element is initialized as a deep copy of @a value.
+     *
+     * @throw @c error { @c errc::invalid_argument } if @a value is uninitialized.
+     * @throw @c error { @c errc::incopatible_type } if @c this is initialized
+     *        and it is not an error.
+     * @throw @c error { @c errc::backend_error } if backend call(s) results a failure.
+     */
+    void push_back (json<Backend> const & value);
+
+    /**
+     * Appends the given element @a value to the end of the array.
+     * @a value is moved into the new element.
+     *
+     * @throws @c error { @c errc::invalid_argument } if @a value is uninitialized.
+     * @throws @c error { @c errc::incopatible_type } if @c this is initialized
+     *         and it is not an error.
+     * @throw @c error { @c errc::backend_error } if backend call(s) results a failure.
+     */
+    void push_back (json<Backend> && value);
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Capacity interface
+////////////////////////////////////////////////////////////////////////////////
+template <typename Backend>
+class capacity_interface
+{
+public:
+    using size_type = typename Backend::size_type;
 
 public:
-////////////////////////////////////////////////////////////////////////////////
-// Constructors, destructors, assignment operators
-////////////////////////////////////////////////////////////////////////////////
-    json ();
-
-    /// Construct @c null value.
-    explicit json (std::nullptr_t);
-
-    /// Construct boolean value.
-    explicit json (bool value);
-
-    /// Construct integer value.
-    explicit json (std::intmax_t value);
-
-    /// Construct from any integral type (bool, char, int, etc).
-    template <typename T>
-    explicit json (T x, typename std::enable_if<std::is_integral<T>::value>::type * = 0)
-        : json(static_cast<std::intmax_t>(x))
-    {}
-
-    /// Construct real value from @c double.
-    explicit json (double value);
-
-    /// Construct from any floating point type.
-    template <typename T>
-    explicit json (T x, typename std::enable_if<std::is_floating_point<T>::value>::type * = 0)
-        : json(static_cast<double>(x))
-    {}
-
-    /// Construct string value.
-    explicit json (string_type const & value);
-
-    /// Construct string value from C-like string.
-    explicit json (char const * value);
-
-    /**
-     * Construct string value from character sequence with length @a n.
-     * Value may contain null characters or not be null terminated.
-     */
-    explicit json (char const * value, std::size_t n);
-
-    json (json const & other);
-
-    json (json && other);
-
-    ~json ();
-
-    json & operator = (json const & other);
-
-    json & operator = (json && other);
-
-    template <typename T>
-    json & operator = (T x)
-    {
-        return operator = (json{x});
-    }
-
-    /// Check if JSON value is initialized.
-    operator bool () const noexcept;
-
-////////////////////////////////////////////////////////////////////////////////
-// Element access
-////////////////////////////////////////////////////////////////////////////////
-    /**
-     * Returns a reference to the element at specified location @a pos.
-     * In case of out of bounds, the result is a reference to an invalid value.
-     */
-    reference operator [] (size_type pos);
-
-    /**
-     * Returns a reference to the element at specified location @a pos.
-     *
-     * @note This overloaded methods needs to avoid ambiguity for zero (0) index
-     */
-    reference operator [] (int pos)
-    {
-        return this->operator[] (static_cast<size_type>(pos));
-    }
-
-    /**
-     * Returns a constant reference to the element at specified location @a pos.
-     * In case of out of bounds, the result is a reference to an invalid value.
-     */
-    const_reference const operator [] (size_type pos) const;
-
-    /**
-     * Returns a reference to the element at specified location @a pos.
-     *
-     * @note This overloaded methods needs to avoid ambiguity for zero (0) index
-     */
-    const_reference operator [] (int pos) const
-    {
-        return this->operator[] (static_cast<size_type>(pos));
-    }
-
-    /**
-     * Returns a reference to the value that is mapped to a key equivalent
-     * to @a key, performing an insertion if such key does not already exist.
-     */
-    reference operator [] (key_type const & key);
-
-    /**
-     * Returns a reference to the value that is mapped to a key equivalent
-     * to @a key. In case of out of bounds, the result is a reference to an
-     * invalid value.
-     */
-    const_reference operator [] (key_type const & key) const;
-
-    /**
-     * Returns a reference to the value that is mapped to a key equivalent
-     * to @a key.
-     */
-    reference operator [] (char const * key);
-
-    /**
-     * Returns a reference to the value that is mapped to a key equivalent
-     * to @a key.
-     */
-    const_reference operator [] (char const * key) const;
-
-    /**
-     *
-     */
-    template <typename T, typename U>
-    friend T get (json<U> const & j, bool * success);
-
-////////////////////////////////////////////////////////////////////////////////
-// Capacity
-////////////////////////////////////////////////////////////////////////////////
     /**
      * Returns the number of elements in the container (if it is an array
      * or object), @c 1 if value is scalar and @c 0 if value is uninitialized
@@ -186,30 +152,271 @@ public:
     {
         return size() == 0;
     }
+};
 
 ////////////////////////////////////////////////////////////////////////////////
-// Modifiers
+// Converter interface
 ////////////////////////////////////////////////////////////////////////////////
+template <typename Backend>
+class converter_interface
+{
+public:
+    //--------------------------------------------------------------------------
+    // Stringification
+    //--------------------------------------------------------------------------
+    std::string to_string () const;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Element access interface
+////////////////////////////////////////////////////////////////////////////////
+
+// template <typename T, typename Backend>
+// struct lexical_cast
+// {
+//     T operator () (U const &, bool * success);
+// };
+
+template <typename Backend>
+class element_accessor_interface
+{
+public:
+    using size_type = typename Backend::size_type;
+    using key_type = typename Backend::key_type;
+    using reference = json_ref<Backend>;
+    using const_reference = json_ref<Backend> const;
+
+public:
     /**
-     * Appends the given element @a value to the end of the array.
-     * The new element is initialized as a deep copy of @a value.
-     *
-     * @throws @c error { @c errc::incopatible_type } if @c this is initialized
-     *         and it is not an error.
-     * @throws @c error { @c errc::invalid_argument } if @a value is uninitialized.
+     * Returns a reference to the element at specified location @a pos.
+     * In case of out of bounds, the result is a reference to an invalid value.
      */
-    void push_back (json const & value);
+    reference operator [] (size_type pos) noexcept;
 
     /**
-     * Appends the given element @a value to the end of the array.
-     * @a value is moved into the new element.
-     *
-     * @throws @c error { @c errc::incopatible_type } if @c this is initialized
-     *         and it is not an error.
-     * @throws @c error { @c errc::invalid_argument } if @a value is uninitialized.
+     * Returns a constant reference to the element at specified location @a pos.
+     * In case of out of bounds, the result is a reference to an invalid value.
      */
-    void push_back (json && value);
+    const_reference operator [] (size_type pos) const noexcept;
 
+    /**
+     * Returns a reference to the element at specified location @a pos.
+     *
+     * @note This overloaded methods needs to avoid ambiguity for zero (0) index.
+     */
+    template <typename IndexT = int>
+    typename std::enable_if<std::is_integral<IndexT>::value
+        && !std::is_same<size_type, IndexT>::value, reference>::type
+    operator [] (IndexT pos) noexcept
+    {
+        return this->operator[] (static_cast<size_type>(pos));
+    }
+
+    /**
+     * Returns a constant reference to the element at specified location @a pos.
+     *
+     * @note This overloaded methods needs to avoid ambiguity for zero (0) index
+     */
+    template <typename IndexT = int>
+    typename std::enable_if<std::is_integral<IndexT>::value
+        && !std::is_same<size_type, IndexT>::value, const_reference>::type
+    operator [] (IndexT pos) const noexcept
+    {
+        return this->operator[] (static_cast<size_type>(pos));
+    }
+
+    /**
+     * Returns a reference to the value that is mapped to a key equivalent
+     * to @a key, performing an insertion if such key does not already exist.
+     */
+    reference operator [] (pfs::string_view key) noexcept;
+    reference operator [] (key_type const & key) noexcept;
+    reference operator [] (char const * key) noexcept;
+
+    /**
+     * Returns a reference to the value that is mapped to a key equivalent
+     * to @a key. In case of out of range, the result is a reference to an
+     * invalid value.
+     */
+    const_reference operator [] (pfs::string_view key) const noexcept;
+    const_reference operator [] (key_type const & key) const noexcept;
+    const_reference operator [] (char const * key) const noexcept;
+
+    /**
+     * Returns a reference to the element at specified location @a pos.
+     *
+     * @throw @c error { @c errc::incopatible_type } if @c this is uninitialized
+     *        or it is not an array.
+     * @throw @c error { @c errc::out_of_range } if @a pos is out of bounds.
+     */
+    reference at (size_type pos) const;
+
+    /**
+     * Returns a reference to the element at specified location @a pos.
+     *
+     * @note This overloaded methods needs to avoid ambiguity for zero (0) index
+     */
+    template <typename IndexT = int>
+    typename std::enable_if<std::is_integral<IndexT>::value
+        && !std::is_same<size_type, IndexT>::value, reference>::type
+    at (IndexT pos) const
+    {
+        return this->at(static_cast<size_type>(pos));
+    }
+
+    /**
+     * Returns a reference to the value that is mapped to a key equivalent
+     * to @a key.
+     *
+     * @throw @c error { @c errc::incopatible_type } if @c this is uninitialized
+     *        or it is not an object.
+     * @throw @c error { @c errc::out_of_range } if an element by @a key not found.
+     */
+    reference at (pfs::string_view key) const;
+    reference at (key_type const & key) const;
+    reference at (char const * key) const;
+
+    /**
+     * Returns the value stored in JSON value/reference.
+     *
+     * Throws exception on error if @a success is @c nullptr.
+     *
+     * @throw @c error { @c errc::incopatible_type } if JSON value/reference
+     *        stored incopatible to @a T type.
+     */
+//     template <typename T>
+//     T get (bool * success)
+//     {
+//         return lexical_cast<T>{}();
+//     }
+//
+// private:
+//     std::intmax_t get (std::intmax_t min, std::intmax_t max, bool * success);
+//     double get (double min, double max, bool * success);
+
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// JSON reference
+////////////////////////////////////////////////////////////////////////////////
+template <typename Backend>
+class json_ref: public Backend::ref
+    , public traits_interface<Backend>
+    , public modifiers_interface<Backend>
+    , public capacity_interface<Backend>
+    , public converter_interface<Backend>
+    , public element_accessor_interface<Backend>
+{
+    friend class json<Backend>;
+    friend class element_accessor_interface<Backend>;
+
+public:
+    using ref_type  = typename Backend::ref;
+    using size_type = typename Backend::size_type;
+    using key_type  = typename Backend::key_type;
+    using reference       = json_ref<Backend>;
+    using const_reference = json_ref<Backend> const;
+
+private:
+    json_ref ();
+
+public:
+    json_ref (typename Backend::ref &&);
+    json_ref (json_ref &&);
+    ~json_ref ();
+
+    /// Check if JSON reference is valid.
+    operator bool () const noexcept;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// JSON value
+////////////////////////////////////////////////////////////////////////////////
+template <typename Backend>
+class json: public Backend::rep
+    , public traits_interface<Backend>
+    , public modifiers_interface<Backend>
+    , public capacity_interface<Backend>
+    , public converter_interface<Backend>
+    , public element_accessor_interface<Backend>
+{
+public:
+    using value_type      = json;
+    using size_type       = typename Backend::size_type;
+    using string_type     = typename Backend::string_type;
+    using key_type        = typename Backend::key_type;
+    using reference       = json_ref<Backend>;
+    using const_reference = json_ref<Backend> const;
+
+private:
+    using rep_type = typename Backend::rep;
+
+public:
+    /// Check if JSON value is initialized.
+    operator bool () const noexcept;
+
+    //--------------------------------------------------------------------------
+    // Constructors, destructors, assignment operators
+    //--------------------------------------------------------------------------
+    json ();
+
+    /// Construct @c null value.
+    json (std::nullptr_t);
+
+    /// Construct boolean value.
+    json (bool value);
+
+    /// Construct integer value.
+    json (std::intmax_t value);
+
+    /// Construct from any integral type (bool, char, int, etc).
+    template <typename T>
+    json (T x, typename std::enable_if<std::is_integral<T>::value>::type * = 0)
+        : json(static_cast<std::intmax_t>(x))
+    {}
+
+    /// Construct real value from @c double.
+    json (double value);
+
+    /// Construct from any floating point type.
+    template <typename T>
+    json (T x, typename std::enable_if<std::is_floating_point<T>::value>::type * = 0)
+        : json(static_cast<double>(x))
+    {}
+
+    /// Construct string value.
+    json (string_type const & value);
+
+    /// Construct string value from C-like string.
+    json (char const * value);
+
+    /**
+     * Construct string value from character sequence with length @a n.
+     * Value may contain null characters or not be null terminated.
+     */
+    json (char const * value, std::size_t n);
+
+    json (json const & other);
+
+    json (json && other);
+
+    ~json ();
+
+    json & operator = (json const & other);
+
+    json & operator = (json && other);
+
+    //--------------------------------------------------------------------------
+    // Modifiers
+    //--------------------------------------------------------------------------
+    /**
+     * Exchanges the contents of the JSON value with those of @a other.
+     */
+    void swap (json & other);
+
+    //--------------------------------------------------------------------------
+    // Save
+    //--------------------------------------------------------------------------
     /**
      * Writes the JSON representaion to the file @a path. If @a path already
      * exists, it is overwritten.
@@ -219,59 +426,23 @@ public:
      * @param indent Number of spaces for indentation (ignored if @a compact
      *        is @c true).
      * @param precision The precision for real numbers output.
+     *
+     * @throw @c error { @c errc::backend_error } if backend call(s) results a failure.
      */
-    bool save (pfs::filesystem::path const & path
+    void save (pfs::filesystem::path const & path
         , bool compact = false
         , int indent = 4
         , int precision = 17);
 
-////////////////////////////////////////////////////////////////////////////////
-// Comparison operators
-////////////////////////////////////////////////////////////////////////////////
+    //--------------------------------------------------------------------------
+    // Comparison operators
+    //--------------------------------------------------------------------------
     template <typename U>
     friend bool operator == (json<U> const & lhs, json<U> const & rhs);
 
-////////////////////////////////////////////////////////////////////////////////
-// Type quieries
-////////////////////////////////////////////////////////////////////////////////
-
-    /// Check if JSON value is null.
-    template <typename U>
-    friend bool is_null (json<U> const & j) noexcept;
-
-    /// Check if JSON value is boolean.
-    template <typename U>
-    friend bool is_bool (json<U> const & j) noexcept;
-
-    /// Check if JSON value is integer.
-    template <typename U>
-    friend bool is_integer (json<U> const & j) noexcept;
-
-    /// Check if JSON value is real.
-    template <typename U>
-    friend bool is_real (json<U> const & j) noexcept;
-
-    /// Check if JSON value is string.
-    template <typename U>
-    friend bool is_string (json<U> const & j) noexcept;
-
-    /// Check if JSON value is array.
-    template <typename U>
-    friend bool is_array (json<U> const & j) noexcept;
-
-    /// Check if JSON value is object.
-    template <typename U>
-    friend bool is_object (json<U> const & j) noexcept;
-
-////////////////////////////////////////////////////////////////////////////////
-// Stringification
-////////////////////////////////////////////////////////////////////////////////
-    template <typename U>
-    friend std::string to_string (json<U> const & j) noexcept;
-
-////////////////////////////////////////////////////////////////////////////////
-// Parsing
-////////////////////////////////////////////////////////////////////////////////
+    //--------------------------------------------------------------------------
+    // Parsing
+    //--------------------------------------------------------------------------
     /**
      * Decodes JSON from string
      */
@@ -293,51 +464,173 @@ inline bool operator != (json<Backend> const & lhs, json<Backend> const & rhs)
 }
 
 template <typename Backend>
-bool is_null (json<Backend> const & j) noexcept;
+inline bool is_null (json<Backend> const & j) noexcept
+{
+    return j.is_null();
+}
 
 template <typename Backend>
-bool is_bool (json<Backend> const & j) noexcept;
+inline bool is_null (json_ref<Backend> const & j) noexcept
+{
+    return j.is_null();
+}
 
 template <typename Backend>
-bool is_integer (json<Backend> const & j) noexcept;
+inline bool is_bool (json<Backend> const & j) noexcept
+{
+    return j.is_bool();
+}
 
 template <typename Backend>
-bool is_real (json<Backend> const & j) noexcept;
+inline bool is_bool (json_ref<Backend> const & j) noexcept
+{
+    return j.is_bool();
+}
 
 template <typename Backend>
-bool is_string (json<Backend> const & j) noexcept;
+inline bool is_integer (json<Backend> const & j) noexcept
+{
+    return j.is_integer();
+}
 
 template <typename Backend>
-bool is_array (json<Backend> const & j) noexcept;
+inline bool is_integer (json_ref<Backend> const & j) noexcept
+{
+    return j.is_integer();
+}
 
 template <typename Backend>
-bool is_object (json<Backend> const & j) noexcept;
+inline bool is_real (json<Backend> const & j) noexcept
+{
+    return j.is_real();
+}
+
+template <typename Backend>
+inline bool is_real (json_ref<Backend> const & j) noexcept
+{
+    return j.is_real();
+}
+
+template <typename Backend>
+inline bool is_string (json<Backend> const & j) noexcept
+{
+    return j.is_string();
+}
+
+template <typename Backend>
+inline bool is_string (json_ref<Backend> const & j) noexcept
+{
+    return j.is_string();
+}
+
+template <typename Backend>
+inline bool is_array (json<Backend> const & j) noexcept
+{
+    return j.is_array();
+}
+
+template <typename Backend>
+inline bool is_array (json_ref<Backend> const & j) noexcept
+{
+    return j.is_array();
+}
+
+template <typename Backend>
+inline bool is_object (json<Backend> const & j) noexcept
+{
+    return j.is_object();
+}
+
+template <typename Backend>
+inline bool is_object (json_ref<Backend> const & j) noexcept
+{
+    return j.is_object();
+}
 
 template <typename Backend>
 inline bool is_scalar (json<Backend> const & j) noexcept
 {
-    return is_null(j) || is_bool(j) || is_integer(j)
-        || is_real(j) || is_string(j);
+    return j.is_scalar();
+}
+
+template <typename Backend>
+inline bool is_scalar (json_ref<Backend> const & j) noexcept
+{
+    return j.is_scalar();
 }
 
 template <typename Backend>
 inline bool is_structured (json<Backend> const & j) noexcept
 {
-    return is_array(j) || is_object(j);
-}
-
-template <typename T, typename Backend>
-T get (json<Backend> const & j, bool * success = nullptr);
-
-template <typename T, typename Backend>
-inline T get_or (json<Backend> const & j, T const & default_value)
-{
-    bool success = true;
-    auto result = get<T, Backend>(j, & success);
-    return success ? result : default_value;
+    return j.is_structured();
 }
 
 template <typename Backend>
-std::string to_string (json<Backend> const & j) noexcept;
+inline bool is_structured (json_ref<Backend> const & j) noexcept
+{
+    return j.is_structured();
+}
+
+// template <typename T, typename Backend>
+// inline typename std::enable_if<std::is_same<T, bool>::value, T>::type
+// get (json<Backend> const & j, bool * success = nullptr);
+//
+// template <typename T, typename Backend>
+// inline typename std::enable_if<std::is_integral<T>::value
+//     && !std::is_same<T, bool>::value, T>::type
+// get (json<Backend> const & j, bool * success = nullptr)
+// {
+//     return static_cast<T>(j.get(
+//           static_cast<std::intmax_t>(std::numeric_limits<T>::min())
+//         , static_cast<std::intmax_t>(std::numeric_limits<T>::max())
+//         , success));
+// }
+//
+// template <typename T, typename Backend>
+// inline typename std::enable_if<std::is_floating_point<T>::value>::type
+// get (json<Backend> const & j, bool * success = nullptr)
+// {
+//     return static_cast<T>(j.get(
+//           static_cast<double>(std::numeric_limits<T>::min())
+//         , static_cast<double>(std::numeric_limits<T>::max())
+//         , success));
+// }
+//
+// // template <typename T, typename Backend>
+// // T get (typename json<Backend>::reference const & j, bool * success = nullptr);
+// //
+// // template <typename T, typename Backend>
+// // inline T get_or (json<Backend> const & j, T const & default_value) noexcept
+// // {
+// //     bool success = true;
+// //     auto result = get<T, Backend>(j, & success);
+// //     return success ? result : default_value;
+// // }
+// //
+// // template <typename T, typename Backend>
+// // inline T get_or (typename json<Backend>::reference const & j, T const & default_value) noexcept
+// // {
+// //     bool success = true;
+// //     auto result = get<T, Backend>(j, & success);
+// //     return success ? result : default_value;
+// // }
+
+template <typename Backend>
+inline void swap (json<Backend> & a, json<Backend> & b)
+{
+    a.swap(b);
+}
+
+template <typename Backend>
+inline std::string to_string (json<Backend> const & j)
+{
+    return j.to_string();
+}
+
+template <typename Backend>
+inline std::string to_string (json_ref<Backend> const & j)
+{
+    return j.to_string();
+}
 
 } // namespace jeyson

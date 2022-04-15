@@ -10,44 +10,54 @@
 #include <memory>
 #include <string>
 #include <cstdint>
+#include <cstring>
+#include <utility>
 
 struct json_t;
 
 namespace jeyson {
+namespace backend {
 
-struct jansson_backend
+struct jansson
 {
     using size_type   = std::size_t;
     using string_type = std::string;
     using key_type    = std::string;
 
-    struct refdata_type {
-        union index_type {
-            size_type i;
-            std::string key;
+    class rep
+    {
+    public:
+        json_t * _ptr {nullptr};
 
-            index_type () {};
-            ~index_type () {};
-        } index;
-
-        json_t * parent {nullptr};
-
-        refdata_type () = default;
-        ~refdata_type () = default;
+    public:
+        rep ();
+        rep (rep const & other);
+        rep (rep && other);
+        rep (json_t * p);
+        ~rep ();
     };
 
-    struct rep_type {
-        json_t * ptr {nullptr};
-        std::shared_ptr<refdata_type> refdata;
+    class ref: public rep
+    {
+    public:
+        json_t * _parent {nullptr};
 
-        rep_type ();
-        rep_type (rep_type const & other);
-        rep_type (rep_type && other);
-        rep_type (json_t * p);
-        rep_type (json_t * p, json_t * parent, size_type index);
-        rep_type (json_t * p, json_t * parent, std::string const & key);
-        ~rep_type ();
+        union index_type {
+            size_type i;
+            key_type key;
+
+            index_type () {}
+            ~index_type () {}
+        } index;
+
+    public:
+        ref ();
+        ~ref ();
+
+        ref (json_t * ptr, json_t * parent, size_type index);
+        ref (json_t * ptr, json_t * parent, std::string const & key);
+        ref (ref &&);
     };
 };
 
-} // namespace jeyson
+}} // namespace jeyson::backend

@@ -8,6 +8,9 @@
 //      2022.02.07 Initial version (jeyson-lib).
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
+#ifndef JEYSON__EXCEPTIONS_DISABLED
+#   define PFS__EXCEPTIONS_ENABLED 1
+#endif
 #include "pfs/error.hpp"
 
 namespace jeyson {
@@ -30,6 +33,7 @@ enum class errc
 //     , bad_json_sequence
     , backend_error
 
+    , out_of_range
     , incopatible_type
     , invalid_argument
     , overflow
@@ -70,6 +74,9 @@ public:
 
             case static_cast<int>(errc::backend_error):
                 return std::string{"backend error"};
+
+            case static_cast<int>(errc::out_of_range):
+                return std::string{"out of range"};
 
             case static_cast<int>(errc::incopatible_type):
                 return std::string{"incopatible type"};
