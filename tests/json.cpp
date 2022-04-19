@@ -332,6 +332,249 @@ void run_basic_tests ()
     }
 }
 
+void run_lexical_cast_tests ()
+{
+    // nullptr_t
+    {
+        bool success = true;
+        jeyson::lexical_cast<std::nullptr_t> cast;
+
+        CHECK_EQ(cast(nullptr, & success), nullptr);
+        CHECK_EQ(cast(true, & success), nullptr);
+        CHECK_EQ(cast(false, & success), nullptr);
+        CHECK_EQ(cast(std::intmax_t{0}, & success), nullptr);
+        CHECK_EQ(cast(std::intmax_t{42}, & success), nullptr);
+        CHECK_EQ(cast(std::intmax_t{-42}, & success), nullptr);
+        CHECK_EQ(cast(0.0, & success), nullptr);
+        CHECK_EQ(cast(3.14159, & success), nullptr);
+        CHECK_EQ(cast("", & success), nullptr);
+        CHECK_EQ(cast("hello", & success), nullptr);
+        CHECK_EQ(cast(0, true, & success), nullptr);
+        CHECK_EQ(cast(0, false, & success), nullptr);
+        CHECK_EQ(cast(42, true, & success), nullptr);
+        CHECK_EQ(cast(42, false, & success), nullptr);
+    }
+
+    // bool
+    {
+        bool success = true;
+        jeyson::lexical_cast<bool> cast;
+
+        CHECK_EQ(cast(nullptr, & success), false);
+        CHECK_EQ(cast(true, & success), true);
+        CHECK_EQ(cast(false, & success), false);
+        CHECK_EQ(cast(std::intmax_t{0}, & success), false);
+        CHECK_EQ(cast(std::intmax_t{42}, & success), true);
+        CHECK_EQ(cast(std::intmax_t{-42}, & success), true);
+        CHECK_EQ(cast(0.0, & success), false);
+        CHECK_EQ(cast(3.14159, & success), true);
+        CHECK_EQ(cast("", & success), false);
+        CHECK_EQ(cast("true", & success), true);
+        CHECK_EQ(cast("TRUE", & success), true);
+        CHECK_EQ(cast("TrUe", & success), true);
+        CHECK_EQ(cast("On", & success), true);
+        CHECK_EQ(cast("YeS", & success), true);
+        CHECK_EQ(cast(0, true, & success), false);
+        CHECK_EQ(cast(0, false, & success), false);
+        CHECK_EQ(cast(42, true, & success), true);
+        CHECK_EQ(cast(42, false, & success), true);
+
+        success = true;
+
+        CHECK_EQ(cast("hello", & success), false);
+        CHECK_EQ(success, false);
+    }
+
+    // std::intmax_t
+    {
+        bool success = true;
+        jeyson::lexical_cast<std::intmax_t> cast;
+
+        CHECK_EQ(cast(nullptr, & success), 0);
+        CHECK_EQ(cast(true, & success), 1);
+        CHECK_EQ(cast(false, & success), 0);
+        CHECK_EQ(cast(std::intmax_t{0}, & success), 0);
+        CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
+        CHECK_EQ(cast(std::intmax_t{-42}, & success), -42);
+        CHECK_EQ(cast(0.0, & success), 0);
+        CHECK_EQ(cast(3.14159, & success), 3);
+        CHECK_EQ(cast("42", & success), 42);
+        CHECK_EQ(cast("-42", & success), -42);
+        CHECK_EQ(cast(0, true, & success), 0);
+        CHECK_EQ(cast(0, false, & success), 0);
+        CHECK_EQ(cast(42, true, & success), 42);
+        CHECK_EQ(cast(42, false, & success), 42);
+
+        success = true;
+        CHECK_EQ(cast(std::numeric_limits<double>::max(), & success), 0);
+        CHECK_EQ(success, false);
+
+        success = true;
+        CHECK_EQ(cast(-std::numeric_limits<double>::max(), & success), 0);
+        CHECK_EQ(success, false);
+
+        success = true;
+        CHECK_EQ(cast("", & success), 0);
+        CHECK_EQ(success, false);
+
+        success = true;
+        CHECK_EQ(cast("99999999999999999999999999999999999", & success), 0);
+        CHECK_EQ(success, false);
+
+        success = true;
+        CHECK_EQ(cast("x", & success), 0);
+        CHECK_EQ(success, false);
+    }
+
+    // char
+    {
+        bool success = true;
+        jeyson::lexical_cast<char> cast;
+
+        CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
+
+        success = true;
+        CHECK_EQ(cast(std::numeric_limits<std::intmax_t>::max(), & success), 0);
+        CHECK_FALSE(success); // overflow
+
+        success = true;
+        CHECK_EQ(cast(std::numeric_limits<std::intmax_t>::min(), & success), 0);
+        CHECK_FALSE(success); // underflow
+    }
+
+    // signed char
+    {
+        bool success = true;
+        jeyson::lexical_cast<signed char> cast;
+
+        CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
+    }
+
+    // unsigned char
+    {
+        bool success = true;
+        jeyson::lexical_cast<unsigned char> cast;
+
+        CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
+    }
+
+    // short
+    {
+        bool success = true;
+        jeyson::lexical_cast<short> cast;
+
+        CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
+    }
+
+    // unsigned short
+    {
+        bool success = true;
+        jeyson::lexical_cast<unsigned short> cast;
+
+        CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
+    }
+
+    // int
+    {
+        bool success = true;
+        jeyson::lexical_cast<int> cast;
+
+        CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
+    }
+
+    // unsigned int
+    {
+        bool success = true;
+        jeyson::lexical_cast<unsigned int> cast;
+
+        CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
+    }
+
+    // long
+    {
+        bool success = true;
+        jeyson::lexical_cast<long> cast;
+
+        CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
+    }
+
+    // unsigned long
+    {
+        bool success = true;
+        jeyson::lexical_cast<unsigned long> cast;
+
+        CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
+    }
+
+#if defined(LLONG_MAX)
+    // long long
+    {
+        bool success = true;
+        jeyson::lexical_cast<long long> cast;
+
+        CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
+    }
+
+    // unsigned long long
+    {
+        bool success = true;
+        jeyson::lexical_cast<unsigned long long> cast;
+
+        CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
+    }
+#endif
+
+    // double
+    {
+        bool success = true;
+        jeyson::lexical_cast<double> cast;
+
+        CHECK_EQ(cast(nullptr, & success), 0.0);
+        CHECK_EQ(cast(true, & success), 1.0);
+        CHECK_EQ(cast(false, & success), 0.0);
+        CHECK_EQ(cast(std::intmax_t{0}, & success), 0.0);
+        CHECK_EQ(cast(std::intmax_t{42}, & success), 42.0);
+        CHECK_EQ(cast(std::intmax_t{-42}, & success), -42.0);
+        CHECK_EQ(cast(0.0, & success), 0.0);
+        CHECK_EQ(cast(3.14159, & success), 3.14159);
+        CHECK_EQ(cast("42", & success), 42.0);
+        CHECK_EQ(cast("-42", & success), -42.0);
+        CHECK_EQ(cast(0, true, & success), 0.0);
+        CHECK_EQ(cast(0, false, & success), 0.0);
+        CHECK_EQ(cast(42, true, & success), 42.0);
+        CHECK_EQ(cast(42, false, & success), 42.0);
+    }
+
+    // std::string
+    {
+        bool success = true;
+        jeyson::lexical_cast<std::string> cast;
+
+        CHECK_EQ(cast(nullptr, & success), "");
+        CHECK_EQ(cast(true, & success), "true");
+        CHECK_EQ(cast(false, & success), "false");
+        CHECK_EQ(cast(std::intmax_t{0}, & success), "0");
+        CHECK_EQ(cast(std::intmax_t{42}, & success), "42");
+        CHECK_EQ(cast(std::intmax_t{-42}, & success), "-42");
+
+        char buf[128];
+        std::sprintf(buf, "%f", 0.0);
+
+        CHECK_EQ(cast(0.0, & success), buf);
+
+        std::sprintf(buf, "%f", 3.14159);
+
+        CHECK_EQ(cast(3.14159, & success), buf);
+
+        CHECK_EQ(cast("42", & success), "42");
+        CHECK_EQ(cast("-42", & success), "-42");
+        CHECK_EQ(cast(0, true, & success), "0");
+        CHECK_EQ(cast(0, false, & success), "0");
+        CHECK_EQ(cast(42, true, & success), "42");
+        CHECK_EQ(cast(42, false, & success), "42");
+    }
+}
+
 template <typename Backend>
 void run_access_tests ()
 {
@@ -373,9 +616,11 @@ void run_access_tests ()
 
         REQUIRE_THROWS(j.at(j.size()));
 
-//         REQUIRE_EQ(jeyson::get<bool>(j[1]), true);
-//         REQUIRE_EQ(jeyson::get<int>(j[2]), 42);
-//         REQUIRE_EQ(jeyson::get<float>(j[3]), float{3.14});
+        REQUIRE_EQ(jeyson::get<std::nullptr_t>(j[0]), nullptr);
+        REQUIRE_EQ(jeyson::get<bool>(j[1]), true);
+        REQUIRE_EQ(jeyson::get<int>(j[2]), 42);
+        REQUIRE_EQ(jeyson::get<char>(j[2]), 42);
+        REQUIRE_EQ(jeyson::get<float>(j[3]), float{3.14});
     }
 
     {
@@ -395,36 +640,144 @@ void run_access_tests ()
         CHECK(is_real(j["real"]));
         CHECK(is_string(j["string"]));
     }
-
-//     {
-//         json j;
-//         j["KEY1"] = json{42};
-//         j["KEY2"] = json{"Hello"};
-//
-//         REQUIRE_EQ(jeyson::get<int>(j["KEY1"]), 42);
-//         REQUIRE_EQ(jeyson::get<std::string>(j["KEY2"]), std::string{"Hello"});
-//     }
-
-//     {
-//         json j;
-//         j.push_back(json{1});
-//         j.push_back(json{"?"});
-//
-//         REQUIRE_EQ(jeyson::get<int>(j[0]), 1);
-//         REQUIRE_EQ(jeyson::get<std::string>(j[1]), std::string{"?"});
-//
-//         j[0] = json{42};
-//         j[1] = json{"Hello"};
-//
-//         REQUIRE_EQ(jeyson::get<int>(j[0]), 42);
-//         REQUIRE_EQ(jeyson::get<std::string>(j[1]), std::string{"Hello"});
-//     }
 }
+
+
+template <typename Backend, typename Int>
+void check_integral_assigment ()
+{
+    using json = jeyson::json<Backend>;
+
+    {
+        json j;
+        j = Int{42};
+
+        CHECK(j.is_integer());
+        CHECK_EQ(jeyson::get<Int>(j), Int{42});
+    }
+
+    {
+        json j;
+
+        j.push_back(nullptr);
+        j.push_back(false);
+        j.push_back(true);
+        j.push_back(42);
+        j.push_back(3.14159);
+        j.push_back("hello");
+
+        CHECK_EQ(j[0].is_null(), true);
+        CHECK_EQ(j[1].is_bool(), true);
+        CHECK_EQ(j[2].is_bool(), true);
+        CHECK_EQ(j[3].is_integer(), true);
+        CHECK_EQ(j[4].is_real(), true);
+        CHECK_EQ(j[5].is_string(), true);
+
+        // FIXME
+        //j[0] = Int{42};
+    }
+
+    {
+        json j;
+
+        // FIXME
+//         j["null"]   = nullptr;
+//         j["false"]  = false;
+//         j["true"]   = true;
+//         j["int"]    = 42;
+//         j["real"]   = 3.14159;
+//         j["string"] = "hello";
+
+    }
+}
+
+template <typename Backend, typename Float>
+void check_floating_point_assigment ()
+{
+    using json = jeyson::json<Backend>;
+
+    {
+        json j;
+        j = Float{42};
+
+        CHECK(j.is_real());
+        CHECK_EQ(jeyson::get<Float>(j), Float{42});
+    }
+}
+
 
 template <typename Backend>
 void run_assignment_tests ()
 {
     using json = jeyson::json<Backend>;
+
+    {
+        json j;
+        j = nullptr;
+
+        CHECK(j.is_null());
+    }
+
+    {
+        json j;
+        j = false;
+
+        CHECK(j.is_bool());
+        CHECK_EQ(jeyson::get<bool>(j), false);
+    }
+
+    {
+        json j;
+        j = true;
+
+        CHECK(j.is_bool());
+        CHECK_EQ(jeyson::get<bool>(j), true);
+    }
+
+    check_integral_assigment<Backend, char>();
+    check_integral_assigment<Backend, signed char>();
+    check_integral_assigment<Backend, unsigned char>();
+    check_integral_assigment<Backend, short>();
+    check_integral_assigment<Backend, unsigned short>();
+    check_integral_assigment<Backend, int>();
+    check_integral_assigment<Backend, unsigned int>();
+    check_integral_assigment<Backend, long>();
+    check_integral_assigment<Backend, unsigned long>();
+
+#if defined(LLONG_MAX)
+    check_integral_assigment<Backend, long long>();
+    check_integral_assigment<Backend, unsigned long long>();
+#endif
+
+    check_floating_point_assigment<Backend, double>();
+    check_floating_point_assigment<Backend, float>();
+
+
+    // FIXME Implement assignment
+    {
+        json j;
+//         j["KEY1"] = json{42};
+//         j["KEY2"] = json{"Hello"};
+//
+//         REQUIRE_EQ(jeyson::get<int>(j["KEY1"]), 42);
+//         REQUIRE_EQ(jeyson::get<std::string>(j["KEY2"]), std::string{"Hello"});
+    }
+
+    // FIXME Implement assignment
+    {
+        json j;
+        j.push_back(json{1});
+        j.push_back(json{"?"});
+
+        REQUIRE_EQ(jeyson::get<int>(j[0]), 1);
+        REQUIRE_EQ(jeyson::get<std::string>(j[1]), std::string{"?"});
+
+//         j[0] = json{42};
+//         j[1] = json{"Hello"};
+//
+//         REQUIRE_EQ(jeyson::get<int>(j[0]), 42);
+//         REQUIRE_EQ(jeyson::get<std::string>(j[1]), std::string{"Hello"});
+    }
 
     // Assing to invalid JSON (non-initialized)
     {
@@ -436,10 +789,9 @@ void run_assignment_tests ()
         j = true;
 
         CHECK(is_bool(j));
-//         CHECK_EQ(jeyson::get<bool>(j), true);
+        CHECK_EQ(jeyson::get<bool>(j), true);
     }
 }
-
 
 template <typename Backend>
 void run_parsing_tests ()
@@ -458,8 +810,8 @@ void run_parsing_tests ()
         REQUIRE(j[0].is_null());
         REQUIRE(j[1].is_bool());
         REQUIRE(j[2].is_integer());
-//         REQUIRE_EQ(jeyson::get<bool>(j[1]), true);
-//         REQUIRE_EQ(jeyson::get<int>(j[2]), 42);
+        REQUIRE_EQ(jeyson::get<bool>(j[1]), true);
+        REQUIRE_EQ(jeyson::get<int>(j[2]), 42);
     }
 
     // Bad
@@ -480,12 +832,13 @@ void run_parsing_tests ()
 
         auto code = j1["statuses"][0]["metadata"]["iso_language_code"];
         REQUIRE(code.is_string());
-        //REQUIRE_EQ(jeyson::get<std::string>(code), std::string{"ja"});
+        REQUIRE_EQ(jeyson::get<std::string>(code), std::string{"ja"});
     }
 }
 
 TEST_CASE("JSON Jansson backend") {
     run_basic_tests<jeyson::backend::jansson>();
+    run_lexical_cast_tests();
     run_assignment_tests<jeyson::backend::jansson>();
     run_access_tests<jeyson::backend::jansson>();
     run_parsing_tests<jeyson::backend::jansson>();

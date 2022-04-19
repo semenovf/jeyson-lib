@@ -11,12 +11,11 @@
 #include "pfs/filesystem.hpp"
 #include "pfs/optional.hpp"
 #include "pfs/string_view.hpp"
+#include "pfs/type_traits.hpp"
 #include <string>
 #include <type_traits>
 #include <cstddef>
 #include <cstdint>
-
-#include "pfs/fmt.hpp"
 
 namespace jeyson {
 
@@ -170,12 +169,195 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 // Element access interface
 ////////////////////////////////////////////////////////////////////////////////
+template <typename T, typename U = void>
+struct lexical_cast
+{
+    T operator () () const noexcept; // default value when casting is unavailable
+    T operator () (std::nullptr_t, bool * success) const noexcept;
+    T operator () (bool, bool * success) const noexcept;
+    T operator () (std::intmax_t, bool * success) const noexcept;
+    T operator () (double, bool * success) const noexcept;
+    T operator () (pfs::string_view const &, bool * success) const noexcept;
+    T operator () (std::size_t /*container size*/, bool /*is_array*/, bool * success) const noexcept;
 
-// template <typename T, typename Backend>
-// struct lexical_cast
-// {
-//     T operator () (U const &, bool * success);
-// };
+    T operator () (char const * s,  bool * success) const noexcept
+    {
+        return this->operator() (pfs::string_view(s, std::strlen(s)), success);
+    }
+};
+
+template <typename T>
+struct lexical_cast<T, typename
+        std::enable_if<
+            std::is_integral<pfs::remove_cvref_t<T>>::value
+            && std::is_signed<T>::value
+            && !std::is_same<bool, pfs::remove_cvref_t<T>>::value
+            && !std::is_same<std::intmax_t, pfs::remove_cvref_t<T>>::value>::type>
+{
+    T operator () () const noexcept
+    {
+        return lexical_cast<std::intmax_t>{}.operator() ();
+    }
+
+    T operator () (std::nullptr_t, bool * success) const noexcept
+    {
+        return lexical_cast<std::intmax_t>{}.operator() (nullptr, success);
+    }
+
+    T operator () (bool v, bool * success) const noexcept
+    {
+        return lexical_cast<std::intmax_t>{}.operator() (v, success);
+    }
+
+    T operator () (std::intmax_t v, bool * success) const noexcept
+    {
+        // Overflow or underflow
+        if (v < std::numeric_limits<T>::min() || v > std::numeric_limits<T>::max()) {
+            *success = false;
+            return this->operator() ();
+        }
+
+        return lexical_cast<std::intmax_t>{}.operator() (v, success);
+    }
+
+    T operator () (double v, bool * success) const noexcept
+    {
+        auto x = lexical_cast<std::intmax_t>{}.operator() (v, success);
+        return this->operator() (x, success);
+    }
+
+    T operator () (pfs::string_view const & v, bool * success) const noexcept
+    {
+        auto x = lexical_cast<std::intmax_t>{}.operator() (v, success);
+        return this->operator() (x, success);
+    }
+
+    T operator () (std::size_t size, bool is_array, bool * success) const noexcept
+    {
+        auto x = lexical_cast<std::intmax_t>{}.operator() (size, is_array, success);
+        return this->operator() (x, success);
+    }
+
+    T operator () (char const * s,  bool * success) const noexcept
+    {
+        auto x = lexical_cast<std::intmax_t>{}.operator() (s, success);
+        return this->operator() (x, success);
+    }
+};
+
+template <typename T>
+struct lexical_cast<T, typename
+        std::enable_if<
+            std::is_integral<pfs::remove_cvref_t<T>>::value
+            && std::is_unsigned<T>::value
+            && !std::is_same<bool, pfs::remove_cvref_t<T>>::value
+            && !std::is_same<std::intmax_t, pfs::remove_cvref_t<T>>::value>::type>
+{
+    T operator () () const noexcept
+    {
+        return lexical_cast<std::intmax_t>{}.operator() ();
+    }
+
+    T operator () (std::nullptr_t, bool * success) const noexcept
+    {
+        return lexical_cast<std::intmax_t>{}.operator() (nullptr, success);
+    }
+
+    T operator () (bool v, bool * success) const noexcept
+    {
+        return lexical_cast<std::intmax_t>{}.operator() (v, success);
+    }
+
+    T operator () (std::intmax_t v, bool * success) const noexcept
+    {
+        // Overflow
+        if (static_cast<std::uintmax_t>(v) > std::numeric_limits<T>::max()) {
+            *success = false;
+            return this->operator() ();
+        }
+
+        return lexical_cast<std::intmax_t>{}.operator() (v, success);
+    }
+
+    T operator () (double v, bool * success) const noexcept
+    {
+        auto x = lexical_cast<std::intmax_t>{}.operator() (v, success);
+        return this->operator() (x, success);
+    }
+
+    T operator () (pfs::string_view const & v, bool * success) const noexcept
+    {
+        auto x = lexical_cast<std::intmax_t>{}.operator() (v, success);
+        return this->operator() (x, success);
+    }
+
+    T operator () (std::size_t size, bool is_array, bool * success) const noexcept
+    {
+        auto x = lexical_cast<std::intmax_t>{}.operator() (size, is_array, success);
+        return this->operator() (x, success);
+    }
+
+    T operator () (char const * s,  bool * success) const noexcept
+    {
+        auto x = lexical_cast<std::intmax_t>{}.operator() (s, success);
+        return this->operator() (x, success);
+    }
+};
+
+template <typename T>
+struct lexical_cast<T, typename
+        std::enable_if<
+            std::is_floating_point<pfs::remove_cvref_t<T>>::value
+            && !std::is_same<double, pfs::remove_cvref_t<T>>::value>::type>
+{
+    T operator () () const noexcept
+    {
+        return lexical_cast<double>{}.operator() ();
+    }
+
+    T operator () (std::nullptr_t, bool * success) const noexcept
+    {
+        return lexical_cast<double>{}.operator() (nullptr, success);
+    }
+
+    T operator () (bool v, bool * success) const noexcept
+    {
+        return lexical_cast<double>{}.operator() (v, success);
+    }
+
+    T operator () (std::intmax_t v, bool * success) const noexcept
+    {
+        return lexical_cast<double>{}.operator() (v, success);
+    }
+
+    T operator () (double v, bool * success) const noexcept
+    {
+        if (v < std::numeric_limits<T>::min() || v > std::numeric_limits<T>::max()) {
+            *success = false;
+            return this->operator() ();
+        }
+
+        return lexical_cast<double>{}.operator() (v, success);
+    }
+
+    T operator () (pfs::string_view const & v, bool * success) const noexcept
+    {
+        auto x = lexical_cast<double>{}.operator() (v, success);
+        return this->operator() (x, success);
+    }
+
+    T operator () (std::size_t size, bool is_array, bool * success) const noexcept
+    {
+        auto x = lexical_cast<double>{}.operator() (size, is_array, success);
+        return this->operator() (x, success);
+    }
+
+    T operator () (char const * s,  bool * success) const noexcept
+    {
+        auto x = lexical_cast<double>{}.operator() (s, success);
+        return this->operator() (x, success);
+    }
+};
 
 template <typename Backend>
 class element_accessor_interface
@@ -185,6 +367,14 @@ public:
     using key_type = typename Backend::key_type;
     using reference = json_ref<Backend>;
     using const_reference = json_ref<Backend> const;
+
+private:
+    bool bool_value () const noexcept;
+    std::intmax_t integer_value () const noexcept;
+    double real_value () const noexcept;
+    pfs::string_view string_value () const noexcept;
+    std::size_t array_size () const noexcept;
+    std::size_t object_size () const noexcept;
 
 public:
     /**
@@ -279,21 +469,68 @@ public:
     /**
      * Returns the value stored in JSON value/reference.
      *
-     * Throws exception on error if @a success is @c nullptr.
+     * @param success Reference to store the result of convertion JSON
+     *        value/reference to specified type.
+     */
+    template <typename T>
+    T get (bool & success) const noexcept
+    {
+        lexical_cast<T> cast;
+        auto self = reinterpret_cast<traits_interface<Backend> const *>(this);
+        success = true;
+
+        if (self->is_bool()) {
+            return cast(bool_value(), & success);
+        } else if (self->is_integer()) {
+            return cast(integer_value(), & success);
+        } else if (self->is_real()) {
+            return cast(real_value(), & success);
+        } else if (self->is_string()) {
+            return cast(string_value(), & success);
+        } else if (self->is_array()) {
+            return cast(array_size(), true, & success);
+        } else if (self->is_object()) {
+            return cast(object_size(), true, & success);
+        } else if (self->is_null()) {
+            return cast(nullptr, & success);
+        } else {
+            success = false;
+        }
+
+        return cast();
+    }
+
+    /**
+     * Returns the value stored in JSON value/reference.
      *
      * @throw @c error { @c errc::incopatible_type } if JSON value/reference
      *        stored incopatible to @a T type.
      */
-//     template <typename T>
-//     T get (bool * success)
-//     {
-//         return lexical_cast<T>{}();
-//     }
-//
-// private:
-//     std::intmax_t get (std::intmax_t min, std::intmax_t max, bool * success);
-//     double get (double min, double max, bool * success);
+    template <typename T>
+    T get () const
+    {
+        bool success = true;
+        auto result = get<T>(success);
 
+        if (!success)
+            JEYSON__THROW(error{errc::incopatible_type});
+
+        return result;
+    }
+
+    /**
+     * Returns the value stored in JSON value/reference.
+     *
+     * @throw @c error { @c errc::incopatible_type } if JSON value/reference
+     *        stored incopatible to @a T type.
+     */
+    template <typename T>
+    T get_or (T const & alt) const noexcept
+    {
+        bool success = true;
+        auto result = get<T>(success);
+        return success ? result : alt;
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -571,49 +808,41 @@ inline bool is_structured (json_ref<Backend> const & j) noexcept
     return j.is_structured();
 }
 
-// template <typename T, typename Backend>
-// inline typename std::enable_if<std::is_same<T, bool>::value, T>::type
-// get (json<Backend> const & j, bool * success = nullptr);
-//
-// template <typename T, typename Backend>
-// inline typename std::enable_if<std::is_integral<T>::value
-//     && !std::is_same<T, bool>::value, T>::type
-// get (json<Backend> const & j, bool * success = nullptr)
-// {
-//     return static_cast<T>(j.get(
-//           static_cast<std::intmax_t>(std::numeric_limits<T>::min())
-//         , static_cast<std::intmax_t>(std::numeric_limits<T>::max())
-//         , success));
-// }
-//
-// template <typename T, typename Backend>
-// inline typename std::enable_if<std::is_floating_point<T>::value>::type
-// get (json<Backend> const & j, bool * success = nullptr)
-// {
-//     return static_cast<T>(j.get(
-//           static_cast<double>(std::numeric_limits<T>::min())
-//         , static_cast<double>(std::numeric_limits<T>::max())
-//         , success));
-// }
-//
-// // template <typename T, typename Backend>
-// // T get (typename json<Backend>::reference const & j, bool * success = nullptr);
-// //
-// // template <typename T, typename Backend>
-// // inline T get_or (json<Backend> const & j, T const & default_value) noexcept
-// // {
-// //     bool success = true;
-// //     auto result = get<T, Backend>(j, & success);
-// //     return success ? result : default_value;
-// // }
-// //
-// // template <typename T, typename Backend>
-// // inline T get_or (typename json<Backend>::reference const & j, T const & default_value) noexcept
-// // {
-// //     bool success = true;
-// //     auto result = get<T, Backend>(j, & success);
-// //     return success ? result : default_value;
-// // }
+template <typename T, typename Backend>
+inline T get (json<Backend> const & j, bool & success) noexcept
+{
+    return j.template get<T>(success);
+}
+
+template <typename T, typename Backend>
+inline T get (json_ref<Backend> const & j, bool & success) noexcept
+{
+    return j.template get<T>(success);
+}
+
+template <typename T, typename Backend>
+inline T get (json<Backend> const & j)
+{
+    return j.template get<T>();
+}
+
+template <typename T, typename Backend>
+inline T get (json_ref<Backend> const & j)
+{
+    return j.template get<T>();
+}
+
+template <typename T, typename Backend>
+inline T get_or (json<Backend> const & j, T const & alt) noexcept
+{
+    return j.template get<T>(alt);
+}
+
+template <typename T, typename Backend>
+inline T get_or (json_ref<Backend> const & j, T const & alt) noexcept
+{
+    return j.template get<T>(alt);
+}
 
 template <typename Backend>
 inline void swap (json<Backend> & a, json<Backend> & b)

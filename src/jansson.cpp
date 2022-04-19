@@ -11,8 +11,12 @@
 #include "pfs/jeyson/backend/jansson.hpp"
 #include "pfs/fmt.hpp"
 #include <jansson.h>
+#include <algorithm>
 #include <limits>
+#include <sstream>
 #include <cassert>
+#include <cctype>
+#include <cstdlib>
 
 namespace jeyson {
 
@@ -25,6 +29,21 @@ namespace jeyson {
 static_assert(std::numeric_limits<std::intmax_t>::max()
     == std::numeric_limits<json_int_t>::max()
     , "");
+
+inline bool case_eq (pfs::string_view const & a, pfs::string_view const & b)
+{
+    auto first1 = a.begin();
+    auto last1 = a.end();
+    auto first2 = b.begin();
+    auto last2 = b.end();
+
+    for (; first1 != last1 && first2 != last2; ++first1, ++first2) {
+        if (std::tolower(*first1) != std::tolower(*first2))
+            return false;
+    }
+
+    return first1 == last1 && first2 == last2;
+}
 
 namespace backend {
 
@@ -584,8 +603,367 @@ converter_interface<BACKEND>::to_string () const
 };
 
 ////////////////////////////////////////////////////////////////////////////////
+// Lexical cast (specializations)
+////////////////////////////////////////////////////////////////////////////////
+
+//------------------------------------------------------------------------------
+// nullptr_t
+//------------------------------------------------------------------------------
+template <>
+std::nullptr_t
+lexical_cast<std::nullptr_t>::operator () () const noexcept
+{
+    return nullptr;
+}
+
+template <>
+std::nullptr_t
+lexical_cast<std::nullptr_t>::operator () (std::nullptr_t, bool *) const noexcept
+{
+    return nullptr;
+}
+
+template <>
+std::nullptr_t
+lexical_cast<std::nullptr_t>::operator () (bool, bool *) const noexcept
+{
+    return nullptr;
+}
+
+template <>
+std::nullptr_t
+lexical_cast<std::nullptr_t>::operator () (std::intmax_t, bool *) const noexcept
+{
+    return nullptr;
+}
+
+template <>
+std::nullptr_t
+lexical_cast<std::nullptr_t>::operator () (double, bool *) const noexcept
+{
+    return nullptr;
+}
+
+template <>
+std::nullptr_t
+lexical_cast<std::nullptr_t>::operator () (pfs::string_view const &, bool *) const noexcept
+{
+    return nullptr;
+}
+
+template <>
+std::nullptr_t
+lexical_cast<std::nullptr_t>::operator () (std::size_t, bool, bool *) const noexcept
+{
+    return nullptr;
+}
+
+//------------------------------------------------------------------------------
+// bool
+//------------------------------------------------------------------------------
+template <>
+bool
+lexical_cast<bool>::operator () () const noexcept
+{
+    return false;
+}
+
+template <>
+bool
+lexical_cast<bool>::operator () (std::nullptr_t, bool *) const noexcept
+{
+    return false;
+}
+
+template <>
+bool
+lexical_cast<bool>::operator () (bool v, bool *) const noexcept
+{
+    return v;
+}
+
+template <>
+bool
+lexical_cast<bool>::operator () (std::intmax_t v, bool *) const noexcept
+{
+    return static_cast<bool>(v);
+}
+
+template <>
+bool
+lexical_cast<bool>::operator () (double v, bool *) const noexcept
+{
+    return static_cast<bool>(v);
+}
+
+template <>
+bool
+lexical_cast<bool>::operator () (pfs::string_view const & v, bool * success) const noexcept
+{
+    if (v.empty())
+        return false;
+
+    if (case_eq(v, "false") || case_eq(v, "no") || case_eq(v, "off"))
+        return false;
+
+    if (case_eq(v, "true") || case_eq(v, "yes") || case_eq(v, "on"))
+        return true;
+
+    *success = false;
+    return this->operator() ();
+}
+
+template <>
+bool
+lexical_cast<bool>::operator () (std::size_t size, bool, bool *) const noexcept
+{
+    return size > 0;
+}
+
+//------------------------------------------------------------------------------
+// std::intmax_t
+//------------------------------------------------------------------------------
+template <>
+std::intmax_t
+lexical_cast<std::intmax_t>::operator () () const noexcept
+{
+    return 0;
+}
+
+template <>
+std::intmax_t
+lexical_cast<std::intmax_t>::operator () (std::nullptr_t, bool *) const noexcept
+{
+    return 0;
+}
+
+template <>
+std::intmax_t
+lexical_cast<std::intmax_t>::operator () (bool v, bool *) const noexcept
+{
+    return v ? 1 : 0;
+}
+
+template <>
+std::intmax_t
+lexical_cast<std::intmax_t>::operator () (std::intmax_t v, bool *) const noexcept
+{
+    return v;
+}
+
+template <>
+std::intmax_t
+lexical_cast<std::intmax_t>::operator () (double v, bool * success) const noexcept
+{
+    if (v >= static_cast<double>(std::numeric_limits<std::intmax_t>::min())
+            && v <= static_cast<double>(std::numeric_limits<std::intmax_t>::max())) {
+        return static_cast<std::intmax_t>(v);
+    }
+
+    *success = false;
+    return this->operator()();
+}
+
+template <>
+std::intmax_t
+lexical_cast<std::intmax_t>::operator () (pfs::string_view const & v, bool * success) const noexcept
+{
+    if (!v.empty()) {
+        char * endptr = nullptr;
+        errno = 0;
+
+        if (sizeof(std::intmax_t) == sizeof(long int)) {
+            auto n = std::strtol(v.data(), & endptr, 10);
+
+            if (endptr == (v.data() + v.size()) && !errno)
+                return static_cast<std::intmax_t>(n);
+        } else {
+            auto n = std::strtoll(v.data(), & endptr, 10);
+
+            if (endptr == (v.data() + v.size()) && !errno)
+                return static_cast<std::intmax_t>(n);
+        }
+    }
+
+    *success = false;
+    return this->operator()();
+}
+
+template <>
+std::intmax_t
+lexical_cast<std::intmax_t>::operator () (std::size_t size, bool, bool *) const noexcept
+{
+    return static_cast<std::intmax_t>(size);
+}
+
+//------------------------------------------------------------------------------
+// double
+//------------------------------------------------------------------------------
+template <>
+double
+lexical_cast<double>::operator () () const noexcept
+{
+    return 0.0;
+}
+
+template <>
+double
+lexical_cast<double>::operator () (std::nullptr_t, bool *) const noexcept
+{
+    return 0.0;
+}
+
+template <>
+double
+lexical_cast<double>::operator () (bool v, bool *) const noexcept
+{
+    return v ? 1.0 : 0.0;
+}
+
+template <>
+double
+lexical_cast<double>::operator () (std::intmax_t v, bool *) const noexcept
+{
+    return static_cast<double>(v);
+}
+
+template <>
+double
+lexical_cast<double>::operator () (double v, bool *) const noexcept
+{
+    return v;
+}
+
+template <>
+double
+lexical_cast<double>::operator () (pfs::string_view const & v, bool * success) const noexcept
+{
+    if (!v.empty()) {
+        errno = 0;
+        char * endptr = nullptr;
+        auto n = std::strtod(v.data(), & endptr);
+
+        auto b = endptr == (v.data() + v.size()) && !errno;
+
+        if (endptr == (v.data() + v.size()) && !errno)
+            return n;
+    }
+
+    *success = false;
+    return this->operator()();
+}
+
+template <>
+double
+lexical_cast<double>::operator () (std::size_t size, bool, bool *) const noexcept
+{
+    return static_cast<std::intmax_t>(size);
+}
+
+//------------------------------------------------------------------------------
+// std::string
+//------------------------------------------------------------------------------
+template <>
+std::string
+lexical_cast<std::string>::operator () () const noexcept
+{
+    return "";
+}
+
+template <>
+std::string
+lexical_cast<std::string>::operator () (std::nullptr_t, bool *) const noexcept
+{
+    return "";
+}
+
+template <>
+std::string
+lexical_cast<std::string>::operator () (bool v, bool *) const noexcept
+{
+    return v ? "true" : "false";
+}
+
+template <>
+std::string
+lexical_cast<std::string>::operator () (std::intmax_t v, bool *) const noexcept
+{
+    return std::to_string(v);
+}
+
+template <>
+std::string
+lexical_cast<std::string>::operator () (double v, bool *) const noexcept
+{
+    return std::to_string(v);
+}
+
+template <>
+std::string
+lexical_cast<std::string>::operator () (pfs::string_view const & v, bool *) const noexcept
+{
+    return std::string(v.data(), v.size());
+}
+
+template <>
+std::string
+lexical_cast<std::string>::operator () (std::size_t size, bool, bool *) const noexcept
+{
+    return std::to_string(size);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Element accessor interface
 ////////////////////////////////////////////////////////////////////////////////
+template <>
+bool
+element_accessor_interface<BACKEND>::bool_value () const noexcept
+{
+    JEYSON__ASSERT(json_is_boolean(CINATIVE(*this)), "Boolean value expected");
+    return json_is_true(CINATIVE(*this)) ? true : false;
+}
+
+template <>
+std::intmax_t
+element_accessor_interface<BACKEND>::integer_value () const noexcept
+{
+    JEYSON__ASSERT(json_is_integer(CINATIVE(*this)), "Integer value expected");
+    return static_cast<std::intmax_t>(json_integer_value(CINATIVE(*this)));
+}
+
+template <>
+double
+element_accessor_interface<BACKEND>::real_value () const noexcept
+{
+    JEYSON__ASSERT(json_is_real(CINATIVE(*this)), "Real value expected");
+    return json_real_value(CINATIVE(*this));
+}
+
+template <>
+pfs::string_view
+element_accessor_interface<BACKEND>::string_value () const noexcept
+{
+    JEYSON__ASSERT(json_is_string(CINATIVE(*this)), "String value expected");
+    return pfs::string_view(json_string_value(CINATIVE(*this))
+        , json_string_length(CINATIVE(*this)));
+}
+
+template <>
+std::size_t
+element_accessor_interface<BACKEND>::array_size () const noexcept
+{
+    JEYSON__ASSERT(json_is_array(CINATIVE(*this)), "Array expected");
+    return json_array_size(CINATIVE(*this));
+}
+
+template <>
+std::size_t
+element_accessor_interface<BACKEND>::object_size () const noexcept
+{
+    JEYSON__ASSERT(json_is_object(CINATIVE(*this)), "Object expected");
+    return json_object_size(CINATIVE(*this));
+}
+
 template <>
 element_accessor_interface<BACKEND>::reference
 element_accessor_interface<BACKEND>::operator [] (size_type pos) noexcept
@@ -763,383 +1141,120 @@ element_accessor_interface<BACKEND>::at (char const * key) const
     return at(pfs::string_view{key});
 }
 
-// // template <>
-// // json<BACKEND> &
-// // json<BACKEND>::operator = (std::nullptr_t)
-// // {
-// //     json j{nullptr};
-// //     this->swap(j);
-// //     return *this;
-// // }
+// template <>
+// json<BACKEND> &
+// json<BACKEND>::operator = (std::nullptr_t)
+// {
+//     json j{nullptr};
+//     this->swap(j);
+//     return *this;
+// }
+
+// template <>
+// json<BACKEND> & json<BACKEND>::operator = (json const & other)
+// {
+//     if (this != & other) {
+//         if (_d.ptr != other._d.ptr) {
+//             // Reference
+//             if (_d.refdata) {
+//                 JEYSON__ASSERT(_d.refdata->parent, "");
+//                 JEYSON__ASSERT(json_is_array(_d.refdata->parent)
+//                     || json_is_object(_d.refdata->parent), "");
 //
-// // template <>
-// // json<BACKEND> & json<BACKEND>::operator = (json const & other)
-// // {
-// //     if (this != & other) {
-// //         if (_d.ptr != other._d.ptr) {
-// //             // Reference
-// //             if (_d.refdata) {
-// //                 JEYSON__ASSERT(_d.refdata->parent, "");
-// //                 JEYSON__ASSERT(json_is_array(_d.refdata->parent)
-// //                     || json_is_object(_d.refdata->parent), "");
-// //
-// //                 if (json_is_array(_d.refdata->parent)) {
-// //                     auto rc = json_array_remove(_d.refdata->parent
-// //                         , _d.refdata->index.i);
-// //
-// //                     if (rc != 0)
-// //                         JEYSON__THROW((error{errc::backend_error, "remove array element failure"}));
-// //
-// //                     rc = json_array_set(_d.refdata->parent
-// //                         , _d.refdata->index.i
-// //                         , json_deep_copy(other._d.ptr));
-// //
-// //                     if (rc != 0)
-// //                         JEYSON__THROW((error{errc::backend_error, "update array element failure"}));
-// //                 } else {
-// //                     auto rc = json_object_deln(_d.refdata->parent
-// //                         , _d.refdata->index.key.c_str()
-// //                         , _d.refdata->index.key.size());
-// //
-// //                     if (rc != 0)
-// //                         JEYSON__THROW((error{errc::backend_error, "remove object element failure"}));
-// //
-// //                     rc = json_object_setn(_d.refdata->parent
-// //                         , _d.refdata->index.key.c_str()
-// //                         , _d.refdata->index.key.size()
-// //                         , json_deep_copy(other._d.ptr));
-// //
-// //                     if (rc != 0)
-// //                         JEYSON__THROW((error{errc::backend_error, "update object element failure"}));
-// //                 }
-// //             } else {
-// //                 this->~json();
-// //                 _d.ptr = json_deep_copy(other._d.ptr);
-// //                 _d.refdata = other._d.refdata;
-// //             }
-// //         }
-// //     }
-// //
-// //     return *this;
-// // }
-// //
-// // template <>
-// // json<BACKEND> & json<BACKEND>::operator = (json && other)
-// // {
-// //     if (this != & other) {
-// //         if (_d.ptr != other._d.ptr) {
-// //             // Reference
-// //             if (_d.refdata) {
-// //                 JEYSON__ASSERT(_d.refdata->parent, "");
-// //                 JEYSON__ASSERT(json_is_array(_d.refdata->parent)
-// //                     || json_is_object(_d.refdata->parent), "");
-// //
-// //                 if (json_is_array(_d.refdata->parent)) {
-// //                     auto rc = json_array_remove(_d.refdata->parent
-// //                         , _d.refdata->index.i);
-// //
-// //                     if (rc != 0)
-// //                         JEYSON__THROW((error{errc::backend_error, "remove array element failure"}));
-// //
-// //                     rc = json_array_set(_d.refdata->parent
-// //                         , _d.refdata->index.i
-// //                         , other._d.ptr);
-// //
-// //                     if (rc != 0)
-// //                         JEYSON__THROW((error{errc::backend_error, "update array element failure"}));
-// //                 } else {
-// //                     auto rc = json_object_deln(_d.refdata->parent
-// //                         , _d.refdata->index.key.c_str()
-// //                         , _d.refdata->index.key.size());
-// //
-// //                     if (rc != 0)
-// //                         JEYSON__THROW((error{errc::backend_error, "remove object element failure"}));
-// //
-// //                     rc = json_object_setn(_d.refdata->parent
-// //                         , _d.refdata->index.key.c_str()
-// //                         , _d.refdata->index.key.size()
-// //                         , other._d.ptr);
-// //
-// //                     if (rc != 0)
-// //                         JEYSON__THROW((error{errc::backend_error, "update object element failure"}));
-// //                 }
-// //
-// //                 other._d.ptr = nullptr;
-// //             } else {
-// //                 this->~json();
-// //
-// //                 if (other._d.ptr) {
-// //                     _d.ptr = other._d.ptr;
-// //                     _d.refdata = std::move(other._d.refdata);
-// //                     other._d.ptr = nullptr;
-// //                 }
-// //             }
-// //         }
-// //     }
-// //
-// //     return *this;
-// // }
-
-
-// // namespace details {
-// //
-// // std::intmax_t get (json_t * j, std::intmax_t min, std::intmax_t max, bool * success)
-// // {
-// //     if (success)
-// //         *success = true;
-// //
-// //     if (! j) {
-// //         if (success)
-// //             *success = false;
-// //         else
-// //             JEYSON__THROW(error(errc::invalid_argument));
-// //
-// //         return 0;
-// //     }
-// //
-// //     if (!json_is_integer(j)) {
-// //         if (success)
-// //             *success = false;
-// //         else
-// //             JEYSON__THROW(error(errc::incopatible_type));
-// //     }
-// //
-// //     auto result = static_cast<std::intmax_t>(json_integer_value(j));
-// //
-// //     if (result < min || result > max) {
-// //         if (success)
-// //             *success = false;
-// //         else
-// //             JEYSON__THROW(error(errc::overflow));
-// //
-// //         result = 0;
-// //     }
-// //
-// //     return result;
-// // }
-// //
-// // double get (json_t * j, double min, double max, bool * success)
-// // {
-// //     if (success)
-// //         *success = true;
-// //
-// //     if (! j) {
-// //         if (success)
-// //             *success = false;
-// //         else
-// //             JEYSON__THROW(error(errc::invalid_argument));
-// //
-// //         return 0;
-// //     }
-// //
-// //     if (!json_is_real(j)) {
-// //         if (success)
-// //             *success = false;
-// //         else
-// //             JEYSON__THROW(error(errc::incopatible_type));
-// //
-// //         return 0;
-// //     }
-// //
-// //     auto result = static_cast<double>(json_real_value(j));
-// //
-// //     if (result < min || result > max) {
-// //         if (success)
-// //             *success = false;
-// //         else
-// //             JEYSON__THROW(error(errc::overflow));
-// //
-// //         result = 0;
-// //     }
-// //
-// //     return result;
-// // }
-// //
-// // } // namespace details
-// //
-// // template <>
-// // bool
-// // get<bool, BACKEND> (json<BACKEND> const & j, bool * success)
-// // {
-// //     if (success)
-// //         *success = true;
-// //
-// //     if (! NATIVE(j)) {
-// //         if (success)
-// //             *success = false;
-// //         else
-// //             JEYSON__THROW(error(errc::invalid_argument));
-// //
-// //         return false;
-// //     }
-// //
-// //     if (!json_is_boolean(NATIVE(j))) {
-// //         if (success)
-// //             *success = false;
-// //         else
-// //             JEYSON__THROW(error(errc::incopatible_type));
-// //
-// //         return false;
-// //     }
-// //
-// //     return static_cast<bool>(json_is_true(NATIVE(j)));
-// // }
-// //
-// // template <>
-// // long long
-// // get<long long, BACKEND> (json<BACKEND> const & j, bool * success)
-// // {
-// //     return static_cast<long long>(details::get(NATIVE(j)
-// //         , static_cast<std::intmax_t>(std::numeric_limits<long long>::min())
-// //         , static_cast<std::intmax_t>(std::numeric_limits<long long>::max())
-// //         , success));
-// // }
-// //
-// // template <>
-// // unsigned long long
-// // get<unsigned long long, BACKEND> (json<BACKEND> const & j, bool * success)
-// // {
-// //     return static_cast<unsigned long long>(details::get(NATIVE(j)
-// //         , static_cast<std::intmax_t>(std::numeric_limits<long long>::min())
-// //         , static_cast<std::intmax_t>(std::numeric_limits<long long>::max())
-// //         , success));
-// // }
-// //
-// // template <>
-// // long
-// // get<long, BACKEND> (json<BACKEND> const & j, bool * success)
-// // {
-// //     return static_cast<long>(details::get(NATIVE(j)
-// //         , static_cast<std::intmax_t>(std::numeric_limits<long>::min())
-// //         , static_cast<std::intmax_t>(std::numeric_limits<long>::max())
-// //         , success));
-// // }
-// //
-// // template <>
-// // unsigned long
-// // get<unsigned long, BACKEND> (json<BACKEND> const & j, bool * success)
-// // {
-// //     return static_cast<unsigned long>(details::get(NATIVE(j)
-// //         , static_cast<std::intmax_t>(std::numeric_limits<long>::min())
-// //         , static_cast<std::intmax_t>(std::numeric_limits<long>::max())
-// //         , success));
-// // }
-// //
-// // template <>
-// // int
-// // get<int, BACKEND> (json<BACKEND> const & j, bool * success)
-// // {
-// //     return static_cast<int>(details::get(NATIVE(j)
-// //         , static_cast<std::intmax_t>(std::numeric_limits<int>::min())
-// //         , static_cast<std::intmax_t>(std::numeric_limits<int>::max())
-// //         , success));
-// // }
-// //
-// // template <>
-// // unsigned int
-// // get<unsigned int, BACKEND> (json<BACKEND> const & j, bool * success)
-// // {
-// //     return static_cast<unsigned int>(details::get(NATIVE(j)
-// //         , static_cast<std::intmax_t>(std::numeric_limits<int>::min())
-// //         , static_cast<std::intmax_t>(std::numeric_limits<int>::max())
-// //         , success));
-// // }
-// //
-// // template <>
-// // short
-// // get<short, BACKEND> (json<BACKEND> const & j, bool * success)
-// // {
-// //     return static_cast<short>(details::get(NATIVE(j)
-// //         , static_cast<std::intmax_t>(std::numeric_limits<short>::min())
-// //         , static_cast<std::intmax_t>(std::numeric_limits<short>::max())
-// //         , success));
-// // }
-// //
-// // template <>
-// // unsigned short
-// // get<unsigned short, BACKEND> (json<BACKEND> const & j, bool * success)
-// // {
-// //     return static_cast<unsigned short>(details::get(NATIVE(j)
-// //         , static_cast<std::intmax_t>(std::numeric_limits<short>::min())
-// //         , static_cast<std::intmax_t>(std::numeric_limits<short>::max())
-// //         , success));
-// // }
-// //
-// // template <>
-// // char
-// // get<char, BACKEND> (json<BACKEND> const & j, bool * success)
-// // {
-// //     return static_cast<char>(details::get(NATIVE(j)
-// //         , static_cast<std::intmax_t>(std::numeric_limits<char>::min())
-// //         , static_cast<std::intmax_t>(std::numeric_limits<char>::max())
-// //         , success));
-// // }
-// //
-// // template <>
-// // signed char
-// // get<signed char, BACKEND> (json<BACKEND> const & j, bool * success)
-// // {
-// //     return static_cast<signed char>(details::get(NATIVE(j)
-// //         , static_cast<std::intmax_t>(std::numeric_limits<signed char>::min())
-// //         , static_cast<std::intmax_t>(std::numeric_limits<signed char>::max())
-// //         , success));
-// // }
-// //
-// // template <>
-// // unsigned char
-// // get<unsigned char, BACKEND> (json<BACKEND> const & j, bool * success)
-// // {
-// //     return static_cast<unsigned char>(details::get(NATIVE(j)
-// //         , static_cast<std::intmax_t>(std::numeric_limits<signed char>::min())
-// //         , static_cast<std::intmax_t>(std::numeric_limits<signed char>::max())
-// //         , success));
-// // }
-// //
-// // template <>
-// // double
-// // get<double, BACKEND> (json<BACKEND> const & j, bool * success)
-// // {
-// //     return details::get(NATIVE(j)
-// //         , std::numeric_limits<double>::min()
-// //         , std::numeric_limits<double>::max()
-// //         , success);
-// // }
-// //
-// // template <>
-// // float
-// // get<float, BACKEND> (json<BACKEND> const & j, bool * success)
-// // {
-// //     return static_cast<float>(details::get(NATIVE(j)
-// //         , static_cast<double>(std::numeric_limits<float>::min())
-// //         , static_cast<double>(std::numeric_limits<float>::max())
-// //         , success));
-// // }
-// //
-// // template <>
-// // std::string
-// // get<std::string, BACKEND> (json<BACKEND> const & j, bool * success)
-// // {
-// //     if (success)
-// //         *success = true;
-// //
-// //     if (! NATIVE(j)) {
-// //         if (success)
-// //             *success = false;
-// //         else
-// //             JEYSON__THROW(error(errc::invalid_argument));
-// //
-// //         return std::string{};
-// //     }
-// //
-// //     if (!json_is_string(NATIVE(j))) {
-// //         if (success)
-// //             *success = false;
-// //         else
-// //             JEYSON__THROW(error(errc::incopatible_type));
-// //
-// //         return std::string{};
-// //     }
-// //
-// //     return std::string(json_string_value(NATIVE(j)), json_string_length(NATIVE(j)));
-// // }
+//                 if (json_is_array(_d.refdata->parent)) {
+//                     auto rc = json_array_remove(_d.refdata->parent
+//                         , _d.refdata->index.i);
+//
+//                     if (rc != 0)
+//                         JEYSON__THROW((error{errc::backend_error, "remove array element failure"}));
+//
+//                     rc = json_array_set(_d.refdata->parent
+//                         , _d.refdata->index.i
+//                         , json_deep_copy(other._d.ptr));
+//
+//                     if (rc != 0)
+//                         JEYSON__THROW((error{errc::backend_error, "update array element failure"}));
+//                 } else {
+//                     auto rc = json_object_deln(_d.refdata->parent
+//                         , _d.refdata->index.key.c_str()
+//                         , _d.refdata->index.key.size());
+//
+//                     if (rc != 0)
+//                         JEYSON__THROW((error{errc::backend_error, "remove object element failure"}));
+//
+//                     rc = json_object_setn(_d.refdata->parent
+//                         , _d.refdata->index.key.c_str()
+//                         , _d.refdata->index.key.size()
+//                         , json_deep_copy(other._d.ptr));
+//
+//                     if (rc != 0)
+//                         JEYSON__THROW((error{errc::backend_error, "update object element failure"}));
+//                 }
+//             } else {
+//                 this->~json();
+//                 _d.ptr = json_deep_copy(other._d.ptr);
+//                 _d.refdata = other._d.refdata;
+//             }
+//         }
+//     }
+//
+//     return *this;
+// }
+//
+// template <>
+// json<BACKEND> & json<BACKEND>::operator = (json && other)
+// {
+//     if (this != & other) {
+//         if (_d.ptr != other._d.ptr) {
+//             // Reference
+//             if (_d.refdata) {
+//                 JEYSON__ASSERT(_d.refdata->parent, "");
+//                 JEYSON__ASSERT(json_is_array(_d.refdata->parent)
+//                     || json_is_object(_d.refdata->parent), "");
+//
+//                 if (json_is_array(_d.refdata->parent)) {
+//                     auto rc = json_array_remove(_d.refdata->parent
+//                         , _d.refdata->index.i);
+//
+//                     if (rc != 0)
+//                         JEYSON__THROW((error{errc::backend_error, "remove array element failure"}));
+//
+//                     rc = json_array_set(_d.refdata->parent
+//                         , _d.refdata->index.i
+//                         , other._d.ptr);
+//
+//                     if (rc != 0)
+//                         JEYSON__THROW((error{errc::backend_error, "update array element failure"}));
+//                 } else {
+//                     auto rc = json_object_deln(_d.refdata->parent
+//                         , _d.refdata->index.key.c_str()
+//                         , _d.refdata->index.key.size());
+//
+//                     if (rc != 0)
+//                         JEYSON__THROW((error{errc::backend_error, "remove object element failure"}));
+//
+//                     rc = json_object_setn(_d.refdata->parent
+//                         , _d.refdata->index.key.c_str()
+//                         , _d.refdata->index.key.size()
+//                         , other._d.ptr);
+//
+//                     if (rc != 0)
+//                         JEYSON__THROW((error{errc::backend_error, "update object element failure"}));
+//                 }
+//
+//                 other._d.ptr = nullptr;
+//             } else {
+//                 this->~json();
+//
+//                 if (other._d.ptr) {
+//                     _d.ptr = other._d.ptr;
+//                     _d.refdata = std::move(other._d.refdata);
+//                     other._d.ptr = nullptr;
+//                 }
+//             }
+//         }
+//     }
+//
+//     return *this;
+// }
 } // namespace jeyson
