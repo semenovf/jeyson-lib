@@ -30,7 +30,7 @@ static_assert(std::numeric_limits<std::intmax_t>::max()
     == std::numeric_limits<json_int_t>::max()
     , "");
 
-inline bool case_eq (pfs::string_view const & a, pfs::string_view const & b)
+inline bool case_eq (string_view const & a, string_view const & b)
 {
     auto first1 = a.begin();
     auto last1 = a.end();
@@ -90,9 +90,9 @@ jansson::ref::ref (ref && other)
 
     if (_parent) {
         if (json_is_object(_parent))
-            new (& index.key) key_type(std::move(other.index.key));
+            new (& _index.key) key_type(std::move(other._index.key));
         else
-            index.i = other.index.i;
+            _index.i = other._index.i;
     }
 
     other._ptr = nullptr;
@@ -106,7 +106,7 @@ jansson::ref::ref (json_t * ptr, json_t * parent, size_type index)
 
     if (parent) {
         _parent = json_incref(parent);
-        ref::index.i = index;
+        _index.i = index;
     }
 }
 
@@ -117,7 +117,7 @@ jansson::ref::ref (json_t * ptr, json_t * parent, std::string const & key)
 
     if (parent) {
         _parent = json_incref(parent);
-        new (& index.key) key_type(key);
+        new (& _index.key) key_type(key);
     }
 }
 
@@ -125,7 +125,7 @@ jansson::ref::~ref ()
 {
     if (_parent) {
         if (json_is_object(_parent))
-            index.key.~basic_string();
+            _index.key.~basic_string();
     }
 
     if (_ptr) {
@@ -136,6 +136,114 @@ jansson::ref::~ref ()
     if (_parent) {
         json_decref(_parent);
         _parent = nullptr;
+    }
+}
+
+// value must be a new reference
+void assign (jansson::rep & rep, json_t * value)
+{
+    if (!value) {
+        JEYSON__THROW((error{errc::invalid_argument
+            , "Attempt to assign null value"}));
+    }
+
+    if (rep._ptr) {
+        json_decref(rep._ptr);
+        rep._ptr = nullptr;
+    }
+
+    rep._ptr = value;
+}
+
+// value must be a new reference
+void assign (jansson::ref & ref, json_t * value)
+{
+    if (!value) {
+        JEYSON__THROW((error{errc::invalid_argument
+            , "Attempt to assign null value"}));
+    }
+
+    if (ref._ptr) {
+        json_decref(ref._ptr);
+        ref._ptr = nullptr;
+    }
+
+    if (ref._parent) {
+        if (json_is_array(ref._parent)) {
+            // Do not steal reference
+            auto rc = json_array_set(ref._parent, ref._index.i, value);
+
+            if (rc != 0) {
+                JEYSON__THROW((error{
+                      errc::backend_error
+                    , "Replace array element failure"}));
+            }
+
+            // Not need `json_incref(value)`, we use non-steal variant of
+            // `json_array_set()` function
+            ref._ptr = value; // json_incref(ref._ptr);
+        } else if (json_is_object(ref._parent)) {
+            auto rc = json_object_setn_nocheck(ref._parent
+                , ref._index.key.c_str()
+                , ref._index.key.size()
+                , value);
+
+            if (rc != 0) {
+                JEYSON__THROW((error{
+                      errc::backend_error
+                    , "Replace object element failure"}));
+            }
+
+            // Not need `json_incref(value)`, we use non-steal variant of
+            // `json_object_setn_nocheck()` function
+            ref._ptr = value;
+        } else {
+            JEYSON__THROW((error{
+                   errc::incopatible_type
+                , "Expected array or object for parent"}));
+        }
+    }
+}
+
+// value must be a new reference
+void insert (json_t * obj, string_view const & key, json_t * value)
+{
+    if (!value) {
+        JEYSON__THROW((error{errc::invalid_argument
+            , "Attempt to insert null value"}));
+    }
+
+    if (!json_is_object(obj)) {
+        error err{errc::incopatible_type, "Object expected"};
+        JEYSON__THROW(err);
+    }
+
+    auto rc = json_object_setn_new_nocheck(obj, key.data(), key.size(), value);
+
+    if (rc != 0) {
+        error err{errc::backend_error, "object insertion failure"};
+        JEYSON__THROW(err);
+    }
+}
+
+// value must be a new reference
+void push_back (json_t * arr, json_t * value)
+{
+    if (!value) {
+        JEYSON__THROW((error{errc::invalid_argument
+            , "Attempt to push back null value"}));
+    }
+
+    if (!json_is_array(arr)) {
+        error err{errc::incopatible_type, "Array expected"};
+        JEYSON__THROW(err);
+    }
+
+    auto rc = json_array_append_new(arr, value);
+
+    if (rc != 0) {
+        error err{errc::backend_error, "Array append failure"};
+        JEYSON__THROW(err);
     }
 }
 
@@ -173,18 +281,8 @@ json<BACKEND>::json (double value) : rep_type(json_real(value))
 {}
 
 template <>
-json<BACKEND>::json (std::string const & value)
-    : rep_type(json_stringn_nocheck(value.c_str(), value.size()))
-{}
-
-template <>
-json<BACKEND>::json (char const * value)
-    : rep_type(json_string_nocheck(value))
-{}
-
-template <>
-json<BACKEND>::json (char const * value, std::size_t n)
-    : rep_type(json_stringn_nocheck(value, n))
+json<BACKEND>::json (string_view const & value)
+    : rep_type(json_stringn_nocheck(value.data(), value.size()))
 {}
 
 template <>
@@ -227,6 +325,58 @@ json<BACKEND>::operator = (json && other)
     }
 
     return *this;
+}
+
+template <>
+void
+json<BACKEND>::assign_helper (std::nullptr_t)
+{
+    if (!json_is_null(_ptr))
+        backend::assign(*this, json_null());
+}
+
+template <>
+void
+json<BACKEND>::assign_helper (bool b)
+{
+    backend::assign(*this, json_boolean(b));
+}
+
+template <>
+void
+json<BACKEND>::assign_helper (std::intmax_t n)
+{
+    if (!json_is_integer(_ptr))
+        backend::assign(*this, json_integer(n));
+    else
+        json_integer_set(_ptr, n);
+}
+
+template <>
+void
+json<BACKEND>::assign_helper (double n)
+{
+    if (!json_is_real(_ptr))
+        backend::assign(*this, json_real(n));
+    else
+        json_real_set(_ptr, n);
+}
+
+template <>
+void
+json<BACKEND>::assign_helper (string_view const & s)
+{
+    if (!json_is_string(_ptr))
+        backend::assign(*this, json_stringn_nocheck(s.data(), s.size()));
+    else
+        json_string_setn_nocheck(_ptr, s.data(), s.size());
+}
+
+template <>
+void
+json<BACKEND>::assign_helper (json const & j)
+{
+    // FIXME
 }
 
 //------------------------------------------------------------------------------
@@ -374,6 +524,48 @@ json_ref<BACKEND>::operator bool () const noexcept
     return _ptr != nullptr;
 }
 
+template <>
+void
+json_ref<BACKEND>::assign_helper (std::nullptr_t)
+{
+    backend::assign(*this, json_null());
+}
+
+template <>
+void
+json_ref<BACKEND>::assign_helper (bool b)
+{
+    backend::assign(*this, json_boolean(b));
+}
+
+template <>
+void
+json_ref<BACKEND>::assign_helper (std::intmax_t n)
+{
+    backend::assign(*this, json_integer(n));
+}
+
+template <>
+void
+json_ref<BACKEND>::assign_helper (double n)
+{
+    backend::assign(*this, json_real(n));
+}
+
+template <>
+void
+json_ref<BACKEND>::assign_helper (string_view const & s)
+{
+    backend::assign(*this, json_stringn_nocheck(s.data(), s.size()));
+}
+
+template <>
+void
+json_ref<BACKEND>::assign_helper (json<BACKEND> const & j)
+{
+    // FIXME
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Traits interface
 ////////////////////////////////////////////////////////////////////////////////
@@ -431,7 +623,59 @@ traits_interface<BACKEND>::is_object () const noexcept
 ////////////////////////////////////////////////////////////////////////////////
 template <>
 void
-modifiers_interface<BACKEND>::insert (key_type const & key, json<BACKEND> const & value)
+modifiers_interface<BACKEND>::insert_helper (string_view const & key
+    , std::nullptr_t)
+{
+    if (!INATIVE(*this))
+        INATIVE(*this) = json_object();
+
+    backend::insert(INATIVE(*this), key, json_null());
+}
+
+template <>
+void
+modifiers_interface<BACKEND>::insert_helper (string_view const & key, bool b)
+{
+    if (!INATIVE(*this))
+        INATIVE(*this) = json_object();
+
+    backend::insert(INATIVE(*this), key, json_boolean(b));
+}
+
+template <>
+void
+modifiers_interface<BACKEND>::insert_helper (string_view const & key, std::intmax_t n)
+{
+    if (!INATIVE(*this))
+        INATIVE(*this) = json_object();
+
+    backend::insert(INATIVE(*this), key, json_integer(n));
+}
+
+template <>
+void
+modifiers_interface<BACKEND>::insert_helper (string_view const & key, double n)
+{
+    if (!INATIVE(*this))
+        INATIVE(*this) = json_object();
+
+    backend::insert(INATIVE(*this), key, json_real(n));
+}
+
+template <>
+void
+modifiers_interface<BACKEND>::insert_helper (string_view const & key, string_view const & s)
+{
+    if (!INATIVE(*this))
+        INATIVE(*this) = json_object();
+
+    backend::insert(INATIVE(*this), key, json_stringn_nocheck(s.data(), s.size()));
+}
+
+template <>
+void
+modifiers_interface<BACKEND>::insert_helper (string_view const & key
+    , json<BACKEND> const & value)
 {
     if (!value) {
         error err {errc::invalid_argument, "attempt to insert unitialized value"};
@@ -454,7 +698,7 @@ modifiers_interface<BACKEND>::insert (key_type const & key, json<BACKEND> const 
     }
 
     auto rc = json_object_setn_new_nocheck(INATIVE(*this)
-        , key.c_str()
+        , key.data()
         , key.size()
         , copy);
 
@@ -496,10 +740,60 @@ modifiers_interface<BACKEND>::insert (key_type const & key, json<BACKEND> && val
 
 template <>
 void
-modifiers_interface<BACKEND>::push_back (json<BACKEND> const & value)
+modifiers_interface<BACKEND>::push_back_helper (std::nullptr_t)
+{
+    if (!INATIVE(*this))
+        INATIVE(*this) = json_array();
+
+    backend::push_back(INATIVE(*this), json_null());
+}
+
+template <>
+void
+modifiers_interface<BACKEND>::push_back_helper (bool b)
+{
+    if (!INATIVE(*this))
+        INATIVE(*this) = json_object();
+
+    backend::push_back(INATIVE(*this), json_boolean(b));
+}
+
+template <>
+void
+modifiers_interface<BACKEND>::push_back_helper (std::intmax_t n)
+{
+    if (!INATIVE(*this))
+        INATIVE(*this) = json_object();
+
+    backend::push_back(INATIVE(*this), json_integer(n));
+}
+
+template <>
+void
+modifiers_interface<BACKEND>::push_back_helper (double n)
+{
+    if (!INATIVE(*this))
+        INATIVE(*this) = json_object();
+
+    backend::push_back(INATIVE(*this), json_real(n));
+}
+
+template <>
+void
+modifiers_interface<BACKEND>::push_back_helper (string_view const & s)
+{
+    if (!INATIVE(*this))
+        INATIVE(*this) = json_object();
+
+    backend::push_back(INATIVE(*this), json_stringn_nocheck(s.data(), s.size()));
+}
+
+template <>
+void
+modifiers_interface<BACKEND>::push_back_helper (json<BACKEND> const & value)
 {
     if (!value) {
-        error err {errc::invalid_argument, "attempt to add unitialized value"};
+        error err {errc::invalid_argument, "Attempt to add unitialized value"};
         JEYSON__THROW(err);
     }
 
@@ -507,21 +801,21 @@ modifiers_interface<BACKEND>::push_back (json<BACKEND> const & value)
         INATIVE(*this) = json_array();
 
     if (!json_is_array(INATIVE(*this))) {
-        error err{errc::incopatible_type, "array expected"};
+        error err{errc::incopatible_type, "Array expected"};
         JEYSON__THROW(err);
     }
 
     auto copy = json_deep_copy(NATIVE(value));
 
     if (!copy) {
-        error err{errc::backend_error, "deep copy failure"};
+        error err{errc::backend_error, "Deep copy failure"};
         JEYSON__THROW(err);
     }
 
     auto rc = json_array_append_new(INATIVE(*this), copy);
 
     if (rc != 0) {
-        error err{errc::backend_error, "array append failure"};
+        error err{errc::backend_error, "Array append failure"};
         JEYSON__THROW(err);
     }
 }
@@ -531,7 +825,7 @@ void
 modifiers_interface<BACKEND>::push_back (json<BACKEND> && value)
 {
     if (!value) {
-        error err {errc::invalid_argument, "attempt to add unitialized value"};
+        error err {errc::invalid_argument, "Attempt to add unitialized value"};
         JEYSON__THROW(err);
     }
 
@@ -539,14 +833,14 @@ modifiers_interface<BACKEND>::push_back (json<BACKEND> && value)
         INATIVE(*this) = json_array();
 
     if (!json_is_array(INATIVE(*this))) {
-        error err{errc::incopatible_type, "array expected"};
+        error err{errc::incopatible_type, "Array expected"};
         JEYSON__THROW(err);
     }
 
     auto rc = json_array_append_new(INATIVE(*this), NATIVE(value));
 
     if (rc != 0) {
-        error err{errc::backend_error, "array append failure"};
+        error err{errc::backend_error, "Array append failure"};
         JEYSON__THROW(err);
     }
 
@@ -603,7 +897,7 @@ converter_interface<BACKEND>::to_string () const
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-// Lexical cast (specializations)
+// Encoder / Decoder
 ////////////////////////////////////////////////////////////////////////////////
 
 //------------------------------------------------------------------------------
@@ -611,49 +905,49 @@ converter_interface<BACKEND>::to_string () const
 //------------------------------------------------------------------------------
 template <>
 std::nullptr_t
-lexical_cast<std::nullptr_t>::operator () () const noexcept
+decoder<std::nullptr_t>::operator () () const noexcept
 {
     return nullptr;
 }
 
 template <>
 std::nullptr_t
-lexical_cast<std::nullptr_t>::operator () (std::nullptr_t, bool *) const noexcept
+decoder<std::nullptr_t>::operator () (std::nullptr_t, bool *) const noexcept
 {
     return nullptr;
 }
 
 template <>
 std::nullptr_t
-lexical_cast<std::nullptr_t>::operator () (bool, bool *) const noexcept
+decoder<std::nullptr_t>::operator () (bool, bool *) const noexcept
 {
     return nullptr;
 }
 
 template <>
 std::nullptr_t
-lexical_cast<std::nullptr_t>::operator () (std::intmax_t, bool *) const noexcept
+decoder<std::nullptr_t>::operator () (std::intmax_t, bool *) const noexcept
 {
     return nullptr;
 }
 
 template <>
 std::nullptr_t
-lexical_cast<std::nullptr_t>::operator () (double, bool *) const noexcept
+decoder<std::nullptr_t>::operator () (double, bool *) const noexcept
 {
     return nullptr;
 }
 
 template <>
 std::nullptr_t
-lexical_cast<std::nullptr_t>::operator () (pfs::string_view const &, bool *) const noexcept
+decoder<std::nullptr_t>::operator () (string_view const &, bool *) const noexcept
 {
     return nullptr;
 }
 
 template <>
 std::nullptr_t
-lexical_cast<std::nullptr_t>::operator () (std::size_t, bool, bool *) const noexcept
+decoder<std::nullptr_t>::operator () (std::size_t, bool, bool *) const noexcept
 {
     return nullptr;
 }
@@ -663,42 +957,42 @@ lexical_cast<std::nullptr_t>::operator () (std::size_t, bool, bool *) const noex
 //------------------------------------------------------------------------------
 template <>
 bool
-lexical_cast<bool>::operator () () const noexcept
+decoder<bool>::operator () () const noexcept
 {
     return false;
 }
 
 template <>
 bool
-lexical_cast<bool>::operator () (std::nullptr_t, bool *) const noexcept
+decoder<bool>::operator () (std::nullptr_t, bool *) const noexcept
 {
     return false;
 }
 
 template <>
 bool
-lexical_cast<bool>::operator () (bool v, bool *) const noexcept
+decoder<bool>::operator () (bool v, bool *) const noexcept
 {
     return v;
 }
 
 template <>
 bool
-lexical_cast<bool>::operator () (std::intmax_t v, bool *) const noexcept
+decoder<bool>::operator () (std::intmax_t v, bool *) const noexcept
 {
     return static_cast<bool>(v);
 }
 
 template <>
 bool
-lexical_cast<bool>::operator () (double v, bool *) const noexcept
+decoder<bool>::operator () (double v, bool *) const noexcept
 {
     return static_cast<bool>(v);
 }
 
 template <>
 bool
-lexical_cast<bool>::operator () (pfs::string_view const & v, bool * success) const noexcept
+decoder<bool>::operator () (string_view const & v, bool * success) const noexcept
 {
     if (v.empty())
         return false;
@@ -715,7 +1009,7 @@ lexical_cast<bool>::operator () (pfs::string_view const & v, bool * success) con
 
 template <>
 bool
-lexical_cast<bool>::operator () (std::size_t size, bool, bool *) const noexcept
+decoder<bool>::operator () (std::size_t size, bool, bool *) const noexcept
 {
     return size > 0;
 }
@@ -725,35 +1019,35 @@ lexical_cast<bool>::operator () (std::size_t size, bool, bool *) const noexcept
 //------------------------------------------------------------------------------
 template <>
 std::intmax_t
-lexical_cast<std::intmax_t>::operator () () const noexcept
+decoder<std::intmax_t>::operator () () const noexcept
 {
     return 0;
 }
 
 template <>
 std::intmax_t
-lexical_cast<std::intmax_t>::operator () (std::nullptr_t, bool *) const noexcept
+decoder<std::intmax_t>::operator () (std::nullptr_t, bool *) const noexcept
 {
     return 0;
 }
 
 template <>
 std::intmax_t
-lexical_cast<std::intmax_t>::operator () (bool v, bool *) const noexcept
+decoder<std::intmax_t>::operator () (bool v, bool *) const noexcept
 {
     return v ? 1 : 0;
 }
 
 template <>
 std::intmax_t
-lexical_cast<std::intmax_t>::operator () (std::intmax_t v, bool *) const noexcept
+decoder<std::intmax_t>::operator () (std::intmax_t v, bool *) const noexcept
 {
     return v;
 }
 
 template <>
 std::intmax_t
-lexical_cast<std::intmax_t>::operator () (double v, bool * success) const noexcept
+decoder<std::intmax_t>::operator () (double v, bool * success) const noexcept
 {
     if (v >= static_cast<double>(std::numeric_limits<std::intmax_t>::min())
             && v <= static_cast<double>(std::numeric_limits<std::intmax_t>::max())) {
@@ -766,7 +1060,7 @@ lexical_cast<std::intmax_t>::operator () (double v, bool * success) const noexce
 
 template <>
 std::intmax_t
-lexical_cast<std::intmax_t>::operator () (pfs::string_view const & v, bool * success) const noexcept
+decoder<std::intmax_t>::operator () (string_view const & v, bool * success) const noexcept
 {
     if (!v.empty()) {
         char * endptr = nullptr;
@@ -791,7 +1085,7 @@ lexical_cast<std::intmax_t>::operator () (pfs::string_view const & v, bool * suc
 
 template <>
 std::intmax_t
-lexical_cast<std::intmax_t>::operator () (std::size_t size, bool, bool *) const noexcept
+decoder<std::intmax_t>::operator () (std::size_t size, bool, bool *) const noexcept
 {
     return static_cast<std::intmax_t>(size);
 }
@@ -801,51 +1095,51 @@ lexical_cast<std::intmax_t>::operator () (std::size_t size, bool, bool *) const 
 //------------------------------------------------------------------------------
 template <>
 double
-lexical_cast<double>::operator () () const noexcept
+decoder<double>::operator () () const noexcept
 {
     return 0.0;
 }
 
 template <>
 double
-lexical_cast<double>::operator () (std::nullptr_t, bool *) const noexcept
+decoder<double>::operator () (std::nullptr_t, bool *) const noexcept
 {
     return 0.0;
 }
 
 template <>
 double
-lexical_cast<double>::operator () (bool v, bool *) const noexcept
+decoder<double>::operator () (bool v, bool *) const noexcept
 {
     return v ? 1.0 : 0.0;
 }
 
 template <>
 double
-lexical_cast<double>::operator () (std::intmax_t v, bool *) const noexcept
+decoder<double>::operator () (std::intmax_t v, bool *) const noexcept
 {
     return static_cast<double>(v);
 }
 
 template <>
 double
-lexical_cast<double>::operator () (double v, bool *) const noexcept
+decoder<double>::operator () (double v, bool *) const noexcept
 {
     return v;
 }
 
 template <>
 double
-lexical_cast<double>::operator () (pfs::string_view const & v, bool * success) const noexcept
+decoder<double>::operator () (string_view const & v, bool * success) const noexcept
 {
     if (!v.empty()) {
         errno = 0;
         char * endptr = nullptr;
         auto n = std::strtod(v.data(), & endptr);
 
-        auto b = endptr == (v.data() + v.size()) && !errno;
+        auto ok = (endptr == (v.data() + v.size()) && !errno);
 
-        if (endptr == (v.data() + v.size()) && !errno)
+        if (ok)
             return n;
     }
 
@@ -855,7 +1149,7 @@ lexical_cast<double>::operator () (pfs::string_view const & v, bool * success) c
 
 template <>
 double
-lexical_cast<double>::operator () (std::size_t size, bool, bool *) const noexcept
+decoder<double>::operator () (std::size_t size, bool, bool *) const noexcept
 {
     return static_cast<std::intmax_t>(size);
 }
@@ -865,52 +1159,85 @@ lexical_cast<double>::operator () (std::size_t size, bool, bool *) const noexcep
 //------------------------------------------------------------------------------
 template <>
 std::string
-lexical_cast<std::string>::operator () () const noexcept
+decoder<std::string>::operator () () const noexcept
 {
     return "";
 }
 
 template <>
 std::string
-lexical_cast<std::string>::operator () (std::nullptr_t, bool *) const noexcept
+decoder<std::string>::operator () (std::nullptr_t, bool *) const noexcept
 {
     return "";
 }
 
 template <>
 std::string
-lexical_cast<std::string>::operator () (bool v, bool *) const noexcept
+decoder<std::string>::operator () (bool v, bool *) const noexcept
 {
     return v ? "true" : "false";
 }
 
 template <>
 std::string
-lexical_cast<std::string>::operator () (std::intmax_t v, bool *) const noexcept
+decoder<std::string>::operator () (std::intmax_t v, bool *) const noexcept
 {
     return std::to_string(v);
 }
 
 template <>
 std::string
-lexical_cast<std::string>::operator () (double v, bool *) const noexcept
+decoder<std::string>::operator () (double v, bool *) const noexcept
 {
     return std::to_string(v);
 }
 
 template <>
 std::string
-lexical_cast<std::string>::operator () (pfs::string_view const & v, bool *) const noexcept
+decoder<std::string>::operator () (string_view const & v, bool *) const noexcept
 {
     return std::string(v.data(), v.size());
 }
 
 template <>
 std::string
-lexical_cast<std::string>::operator () (std::size_t size, bool, bool *) const noexcept
+decoder<std::string>::operator () (std::size_t size, bool, bool *) const noexcept
 {
     return std::to_string(size);
 }
+
+//------------------------------------------------------------------------------
+// Encoder (string)
+//------------------------------------------------------------------------------
+// template <>
+// bool
+// encoder<string_view>::to_bool (string_view const & s) const noexcept
+// {}
+//
+// template <>
+// std::intmax_t
+// encoder<string_view>::to_intmax (string_view const & s) const noexcept
+// {}
+//
+// template <>
+// double
+// encoder<string_view>::to_real (string_view const & n) const noexcept
+// {}
+//
+// template <>
+// bool
+// encoder<std::string>::to_bool (std::string const & s) const noexcept
+// {}
+//
+// template <>
+// std::intmax_t
+// encoder<std::string>::to_intmax (std::string const & s) const noexcept
+// {}
+//
+// template <>
+// double
+// encoder<std::string>::to_real (std::string const & n) const noexcept
+// {}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Element accessor interface
@@ -940,11 +1267,11 @@ element_accessor_interface<BACKEND>::real_value () const noexcept
 }
 
 template <>
-pfs::string_view
+string_view
 element_accessor_interface<BACKEND>::string_value () const noexcept
 {
     JEYSON__ASSERT(json_is_string(CINATIVE(*this)), "String value expected");
-    return pfs::string_view(json_string_value(CINATIVE(*this))
+    return string_view(json_string_value(CINATIVE(*this))
         , json_string_length(CINATIVE(*this)));
 }
 
@@ -1004,9 +1331,12 @@ element_accessor_interface<BACKEND>::operator [] (size_type pos) const noexcept
 
 template <>
 element_accessor_interface<BACKEND>::reference
-element_accessor_interface<BACKEND>::operator [] (pfs::string_view key) noexcept
+element_accessor_interface<BACKEND>::operator [] (string_view const & key) noexcept
 {
-    if (!INATIVE(*this) || !json_is_object(INATIVE(*this)))
+    if (!INATIVE(*this))
+        INATIVE(*this) = json_object();
+
+    if (!json_is_object(INATIVE(*this)))
         return reference{};
 
     auto ptr = json_object_getn(INATIVE(*this), key.data(), key.length());
@@ -1031,19 +1361,19 @@ template <>
 element_accessor_interface<BACKEND>::reference
 element_accessor_interface<BACKEND>::operator [] (key_type const & key) noexcept
 {
-    return this->operator[] (pfs::string_view{key});
+    return this->operator[] (string_view{key});
 }
 
 template <>
 element_accessor_interface<BACKEND>::reference
 element_accessor_interface<BACKEND>::operator [] (char const * key) noexcept
 {
-    return this->operator[] (pfs::string_view{key});
+    return this->operator[] (string_view{key});
 }
 
 template <>
 element_accessor_interface<BACKEND>::const_reference
-element_accessor_interface<BACKEND>::operator [] (pfs::string_view key) const noexcept
+element_accessor_interface<BACKEND>::operator [] (string_view const & key) const noexcept
 {
     if (!CINATIVE(*this) || !json_is_object(CINATIVE(*this)))
         return reference{};
@@ -1110,7 +1440,7 @@ element_accessor_interface<BACKEND>::at (size_type pos) const
 
 template <>
 element_accessor_interface<BACKEND>::reference
-element_accessor_interface<BACKEND>::at (pfs::string_view key) const
+element_accessor_interface<BACKEND>::at (string_view const & key) const
 {
     if (!CINATIVE(*this) || !json_is_object(CINATIVE(*this))) {
         error err{errc::incopatible_type, "object expected"};
@@ -1131,14 +1461,14 @@ template <>
 element_accessor_interface<BACKEND>::reference
 element_accessor_interface<BACKEND>::at (key_type const & key) const
 {
-    return at(pfs::string_view{key});
+    return at(string_view{key});
 }
 
 template <>
 element_accessor_interface<BACKEND>::reference
 element_accessor_interface<BACKEND>::at (char const * key) const
 {
-    return at(pfs::string_view{key});
+    return at(string_view{key});
 }
 
 // template <>
@@ -1147,114 +1477,6 @@ element_accessor_interface<BACKEND>::at (char const * key) const
 // {
 //     json j{nullptr};
 //     this->swap(j);
-//     return *this;
-// }
-
-// template <>
-// json<BACKEND> & json<BACKEND>::operator = (json const & other)
-// {
-//     if (this != & other) {
-//         if (_d.ptr != other._d.ptr) {
-//             // Reference
-//             if (_d.refdata) {
-//                 JEYSON__ASSERT(_d.refdata->parent, "");
-//                 JEYSON__ASSERT(json_is_array(_d.refdata->parent)
-//                     || json_is_object(_d.refdata->parent), "");
-//
-//                 if (json_is_array(_d.refdata->parent)) {
-//                     auto rc = json_array_remove(_d.refdata->parent
-//                         , _d.refdata->index.i);
-//
-//                     if (rc != 0)
-//                         JEYSON__THROW((error{errc::backend_error, "remove array element failure"}));
-//
-//                     rc = json_array_set(_d.refdata->parent
-//                         , _d.refdata->index.i
-//                         , json_deep_copy(other._d.ptr));
-//
-//                     if (rc != 0)
-//                         JEYSON__THROW((error{errc::backend_error, "update array element failure"}));
-//                 } else {
-//                     auto rc = json_object_deln(_d.refdata->parent
-//                         , _d.refdata->index.key.c_str()
-//                         , _d.refdata->index.key.size());
-//
-//                     if (rc != 0)
-//                         JEYSON__THROW((error{errc::backend_error, "remove object element failure"}));
-//
-//                     rc = json_object_setn(_d.refdata->parent
-//                         , _d.refdata->index.key.c_str()
-//                         , _d.refdata->index.key.size()
-//                         , json_deep_copy(other._d.ptr));
-//
-//                     if (rc != 0)
-//                         JEYSON__THROW((error{errc::backend_error, "update object element failure"}));
-//                 }
-//             } else {
-//                 this->~json();
-//                 _d.ptr = json_deep_copy(other._d.ptr);
-//                 _d.refdata = other._d.refdata;
-//             }
-//         }
-//     }
-//
-//     return *this;
-// }
-//
-// template <>
-// json<BACKEND> & json<BACKEND>::operator = (json && other)
-// {
-//     if (this != & other) {
-//         if (_d.ptr != other._d.ptr) {
-//             // Reference
-//             if (_d.refdata) {
-//                 JEYSON__ASSERT(_d.refdata->parent, "");
-//                 JEYSON__ASSERT(json_is_array(_d.refdata->parent)
-//                     || json_is_object(_d.refdata->parent), "");
-//
-//                 if (json_is_array(_d.refdata->parent)) {
-//                     auto rc = json_array_remove(_d.refdata->parent
-//                         , _d.refdata->index.i);
-//
-//                     if (rc != 0)
-//                         JEYSON__THROW((error{errc::backend_error, "remove array element failure"}));
-//
-//                     rc = json_array_set(_d.refdata->parent
-//                         , _d.refdata->index.i
-//                         , other._d.ptr);
-//
-//                     if (rc != 0)
-//                         JEYSON__THROW((error{errc::backend_error, "update array element failure"}));
-//                 } else {
-//                     auto rc = json_object_deln(_d.refdata->parent
-//                         , _d.refdata->index.key.c_str()
-//                         , _d.refdata->index.key.size());
-//
-//                     if (rc != 0)
-//                         JEYSON__THROW((error{errc::backend_error, "remove object element failure"}));
-//
-//                     rc = json_object_setn(_d.refdata->parent
-//                         , _d.refdata->index.key.c_str()
-//                         , _d.refdata->index.key.size()
-//                         , other._d.ptr);
-//
-//                     if (rc != 0)
-//                         JEYSON__THROW((error{errc::backend_error, "update object element failure"}));
-//                 }
-//
-//                 other._d.ptr = nullptr;
-//             } else {
-//                 this->~json();
-//
-//                 if (other._d.ptr) {
-//                     _d.ptr = other._d.ptr;
-//                     _d.refdata = std::move(other._d.refdata);
-//                     other._d.ptr = nullptr;
-//                 }
-//             }
-//         }
-//     }
-//
 //     return *this;
 // }
 } // namespace jeyson

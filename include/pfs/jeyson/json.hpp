@@ -25,6 +25,280 @@ class json;
 template <typename Backend>
 class json_ref;
 
+using pfs::string_view;
+
+////////////////////////////////////////////////////////////////////////////////
+// Encoder / Decoder
+////////////////////////////////////////////////////////////////////////////////
+template <typename T, typename U = void>
+struct decoder
+{
+    T operator () () const noexcept; // default value when casting is unavailable
+    T operator () (std::nullptr_t, bool * success) const noexcept;
+    T operator () (bool, bool * success) const noexcept;
+    T operator () (std::intmax_t, bool * success) const noexcept;
+    T operator () (double, bool * success) const noexcept;
+    T operator () (string_view const &, bool * success) const noexcept;
+    T operator () (std::size_t /*container size*/, bool /*is_array*/, bool * success) const noexcept;
+
+    T operator () (char const * s,  bool * success) const noexcept
+    {
+        return this->operator() (string_view(s, std::strlen(s)), success);
+    }
+};
+
+template <typename T>
+struct decoder<T, typename
+        std::enable_if<
+            std::is_integral<T>::value
+            && std::is_signed<T>::value
+            && !std::is_same<bool, pfs::remove_cvref_t<T>>::value
+            && !std::is_same<std::intmax_t, pfs::remove_cvref_t<T>>::value>::type>
+{
+    T operator () () const noexcept
+    {
+        return decoder<std::intmax_t>{}.operator() ();
+    }
+
+    T operator () (std::nullptr_t, bool * success) const noexcept
+    {
+        return decoder<std::intmax_t>{}.operator() (nullptr, success);
+    }
+
+    T operator () (bool v, bool * success) const noexcept
+    {
+        return decoder<std::intmax_t>{}.operator() (v, success);
+    }
+
+    T operator () (std::intmax_t v, bool * success) const noexcept
+    {
+        // Overflow or underflow
+        if (v < std::numeric_limits<T>::min() || v > std::numeric_limits<T>::max()) {
+            *success = false;
+            return this->operator() ();
+        }
+
+        return decoder<std::intmax_t>{}.operator() (v, success);
+    }
+
+    T operator () (double v, bool * success) const noexcept
+    {
+        auto x = decoder<std::intmax_t>{}.operator() (v, success);
+        return this->operator() (x, success);
+    }
+
+    T operator () (string_view const & v, bool * success) const noexcept
+    {
+        auto x = decoder<std::intmax_t>{}.operator() (v, success);
+        return this->operator() (x, success);
+    }
+
+    T operator () (std::size_t size, bool is_array, bool * success) const noexcept
+    {
+        auto x = decoder<std::intmax_t>{}.operator() (size, is_array, success);
+        return this->operator() (x, success);
+    }
+
+    T operator () (char const * s,  bool * success) const noexcept
+    {
+        auto x = decoder<std::intmax_t>{}.operator() (s, success);
+        return this->operator() (x, success);
+    }
+};
+
+template <typename T>
+struct decoder<T, typename
+        std::enable_if<
+            std::is_integral<T>::value
+            && std::is_unsigned<T>::value
+            && !std::is_same<bool, pfs::remove_cvref_t<T>>::value
+            && !std::is_same<std::intmax_t, pfs::remove_cvref_t<T>>::value>::type>
+{
+    T operator () () const noexcept
+    {
+        return decoder<std::intmax_t>{}.operator() ();
+    }
+
+    T operator () (std::nullptr_t, bool * success) const noexcept
+    {
+        return decoder<std::intmax_t>{}.operator() (nullptr, success);
+    }
+
+    T operator () (bool v, bool * success) const noexcept
+    {
+        return decoder<std::intmax_t>{}.operator() (v, success);
+    }
+
+    T operator () (std::intmax_t v, bool * success) const noexcept
+    {
+        // Overflow
+        if (static_cast<std::uintmax_t>(v) > std::numeric_limits<T>::max()) {
+            *success = false;
+            return this->operator() ();
+        }
+
+        return decoder<std::intmax_t>{}.operator() (v, success);
+    }
+
+    T operator () (double v, bool * success) const noexcept
+    {
+        auto x = decoder<std::intmax_t>{}.operator() (v, success);
+        return this->operator() (x, success);
+    }
+
+    T operator () (string_view const & v, bool * success) const noexcept
+    {
+        auto x = decoder<std::intmax_t>{}.operator() (v, success);
+        return this->operator() (x, success);
+    }
+
+    T operator () (std::size_t size, bool is_array, bool * success) const noexcept
+    {
+        auto x = decoder<std::intmax_t>{}.operator() (size, is_array, success);
+        return this->operator() (x, success);
+    }
+
+    T operator () (char const * s,  bool * success) const noexcept
+    {
+        auto x = decoder<std::intmax_t>{}.operator() (s, success);
+        return this->operator() (x, success);
+    }
+};
+
+template <typename T>
+struct decoder<T, typename
+        std::enable_if<
+            std::is_floating_point<T>::value
+            && !std::is_same<double, pfs::remove_cvref_t<T>>::value>::type>
+{
+    T operator () () const noexcept
+    {
+        return decoder<double>{}.operator() ();
+    }
+
+    T operator () (std::nullptr_t, bool * success) const noexcept
+    {
+        return decoder<double>{}.operator() (nullptr, success);
+    }
+
+    T operator () (bool v, bool * success) const noexcept
+    {
+        return decoder<double>{}.operator() (v, success);
+    }
+
+    T operator () (std::intmax_t v, bool * success) const noexcept
+    {
+        return decoder<double>{}.operator() (v, success);
+    }
+
+    T operator () (double v, bool * success) const noexcept
+    {
+        if (v < std::numeric_limits<T>::min() || v > std::numeric_limits<T>::max()) {
+            *success = false;
+            return this->operator() ();
+        }
+
+        return decoder<double>{}.operator() (v, success);
+    }
+
+    T operator () (string_view const & v, bool * success) const noexcept
+    {
+        auto x = decoder<double>{}.operator() (v, success);
+        return this->operator() (x, success);
+    }
+
+    T operator () (std::size_t size, bool is_array, bool * success) const noexcept
+    {
+        auto x = decoder<double>{}.operator() (size, is_array, success);
+        return this->operator() (x, success);
+    }
+
+    T operator () (char const * s,  bool * success) const noexcept
+    {
+        auto x = decoder<double>{}.operator() (s, success);
+        return this->operator() (x, success);
+    }
+};
+
+template <typename T, typename U = void>
+struct encoder;
+
+template <>
+struct encoder<std::nullptr_t>
+{
+    std::nullptr_t operator () (std::nullptr_t const &) const noexcept
+    {
+        return nullptr;
+    }
+};
+
+template <>
+struct encoder<bool>
+{
+    bool operator () (bool const & b) const noexcept
+    {
+        return b;
+    }
+};
+
+template <typename T>
+struct encoder<T, typename
+    std::enable_if<
+        std::is_integral<T>::value
+        && !std::is_same<bool, pfs::remove_cvref_t<T>>::value>::type>
+{
+    std::intmax_t operator () (T const & n) const noexcept
+    {
+        return static_cast<std::intmax_t>(n);
+    }
+};
+
+template <typename T>
+struct encoder<T, typename
+    std::enable_if<std::is_floating_point<T>::value>::type>
+{
+    double operator () (T const & n) const noexcept
+    {
+        return static_cast<double>(n);
+    }
+};
+
+template <>
+struct encoder<string_view>
+{
+    string_view const & operator () (string_view const & s) const noexcept
+    {
+        return s;
+    }
+};
+
+template <>
+struct encoder<std::string>
+{
+    std::string const & operator () (std::string const & s) const noexcept
+    {
+        return s;
+    }
+};
+
+template <>
+struct encoder<char const *>
+{
+    char const * operator () (char const * s) const noexcept
+    {
+        return s;
+    }
+};
+
+template <typename T>
+struct encoder<json<T>>
+{
+    json<T> const & operator () (json<T> const & j) const noexcept
+    {
+        return j;
+    }
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 // Traits interface
 ////////////////////////////////////////////////////////////////////////////////
@@ -81,6 +355,43 @@ public:
     using size_type = typename Backend::size_type;
     using key_type = typename Backend::key_type;
 
+private:
+    void insert_helper (string_view const & key, std::nullptr_t);
+    void insert_helper (string_view const & key, bool);
+    void insert_helper (string_view const & key, std::intmax_t);
+    void insert_helper (string_view const & key, double);
+    void insert_helper (string_view const & key, string_view const & s);
+
+    void insert_helper (string_view const & key, std::string const & s)
+    {
+        insert_helper(key, string_view{s});
+    }
+
+    void insert_helper (string_view const & key, char const * s)
+    {
+        insert_helper(key, string_view{s});
+    }
+
+    void insert_helper (string_view const & key, json<Backend> const & j);
+
+    void push_back_helper (std::nullptr_t);
+    void push_back_helper (bool);
+    void push_back_helper (std::intmax_t);
+    void push_back_helper (double);
+    void push_back_helper (string_view const & s);
+
+    void push_back_helper (std::string const & s)
+    {
+        push_back_helper(string_view{s});
+    }
+
+    void push_back_helper (char const * s)
+    {
+        push_back_helper(string_view{s});
+    }
+
+    void push_back_helper (json<Backend> const & j);
+
 public:
     /**
      * Inserts copy of @a value into the object overriding if the object
@@ -96,7 +407,40 @@ public:
      *        and it is not an object.
      * @throw @c error { @c errc::backend_error } if backend call(s) results a failure.
      */
-    void insert (key_type const & key, json<Backend> const & value);
+    template <typename T>
+    void insert (string_view const & key, T const & value)
+    {
+        encoder<T> encode;
+        this->insert_helper(key, encode(value));
+    }
+
+    template <typename T>
+    void insert (key_type const & key, T const & value)
+    {
+        this->insert(string_view{key}, value);
+    }
+
+    template <typename T>
+    void insert (char const * key, T const & value)
+    {
+        this->insert(string_view{key}, value);
+    }
+
+    void insert (string_view const & key, char const * value)
+    {
+        encoder<char const *> encode;
+        this->insert_helper(key, encode(value));
+    }
+
+    void insert (key_type const & key, char const * value)
+    {
+        this->insert(string_view{key}, value);
+    }
+
+    void insert (char const * key, char const * value)
+    {
+        this->insert(string_view{key}, value);
+    }
 
     /**
      * Inserts @a value into the object overriding if the object already contains
@@ -113,7 +457,18 @@ public:
      *        and it is not an error.
      * @throw @c error { @c errc::backend_error } if backend call(s) results a failure.
      */
-    void push_back (json<Backend> const & value);
+    template <typename T>
+    void push_back (T const & value)
+    {
+        encoder<T> encode;
+        push_back_helper(encode(value));
+    }
+
+    void push_back (char const * value)
+    {
+        encoder<char const *> encode;
+        push_back_helper(encode(value));
+    }
 
     /**
      * Appends the given element @a value to the end of the array.
@@ -169,196 +524,6 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 // Element access interface
 ////////////////////////////////////////////////////////////////////////////////
-template <typename T, typename U = void>
-struct lexical_cast
-{
-    T operator () () const noexcept; // default value when casting is unavailable
-    T operator () (std::nullptr_t, bool * success) const noexcept;
-    T operator () (bool, bool * success) const noexcept;
-    T operator () (std::intmax_t, bool * success) const noexcept;
-    T operator () (double, bool * success) const noexcept;
-    T operator () (pfs::string_view const &, bool * success) const noexcept;
-    T operator () (std::size_t /*container size*/, bool /*is_array*/, bool * success) const noexcept;
-
-    T operator () (char const * s,  bool * success) const noexcept
-    {
-        return this->operator() (pfs::string_view(s, std::strlen(s)), success);
-    }
-};
-
-template <typename T>
-struct lexical_cast<T, typename
-        std::enable_if<
-            std::is_integral<pfs::remove_cvref_t<T>>::value
-            && std::is_signed<T>::value
-            && !std::is_same<bool, pfs::remove_cvref_t<T>>::value
-            && !std::is_same<std::intmax_t, pfs::remove_cvref_t<T>>::value>::type>
-{
-    T operator () () const noexcept
-    {
-        return lexical_cast<std::intmax_t>{}.operator() ();
-    }
-
-    T operator () (std::nullptr_t, bool * success) const noexcept
-    {
-        return lexical_cast<std::intmax_t>{}.operator() (nullptr, success);
-    }
-
-    T operator () (bool v, bool * success) const noexcept
-    {
-        return lexical_cast<std::intmax_t>{}.operator() (v, success);
-    }
-
-    T operator () (std::intmax_t v, bool * success) const noexcept
-    {
-        // Overflow or underflow
-        if (v < std::numeric_limits<T>::min() || v > std::numeric_limits<T>::max()) {
-            *success = false;
-            return this->operator() ();
-        }
-
-        return lexical_cast<std::intmax_t>{}.operator() (v, success);
-    }
-
-    T operator () (double v, bool * success) const noexcept
-    {
-        auto x = lexical_cast<std::intmax_t>{}.operator() (v, success);
-        return this->operator() (x, success);
-    }
-
-    T operator () (pfs::string_view const & v, bool * success) const noexcept
-    {
-        auto x = lexical_cast<std::intmax_t>{}.operator() (v, success);
-        return this->operator() (x, success);
-    }
-
-    T operator () (std::size_t size, bool is_array, bool * success) const noexcept
-    {
-        auto x = lexical_cast<std::intmax_t>{}.operator() (size, is_array, success);
-        return this->operator() (x, success);
-    }
-
-    T operator () (char const * s,  bool * success) const noexcept
-    {
-        auto x = lexical_cast<std::intmax_t>{}.operator() (s, success);
-        return this->operator() (x, success);
-    }
-};
-
-template <typename T>
-struct lexical_cast<T, typename
-        std::enable_if<
-            std::is_integral<pfs::remove_cvref_t<T>>::value
-            && std::is_unsigned<T>::value
-            && !std::is_same<bool, pfs::remove_cvref_t<T>>::value
-            && !std::is_same<std::intmax_t, pfs::remove_cvref_t<T>>::value>::type>
-{
-    T operator () () const noexcept
-    {
-        return lexical_cast<std::intmax_t>{}.operator() ();
-    }
-
-    T operator () (std::nullptr_t, bool * success) const noexcept
-    {
-        return lexical_cast<std::intmax_t>{}.operator() (nullptr, success);
-    }
-
-    T operator () (bool v, bool * success) const noexcept
-    {
-        return lexical_cast<std::intmax_t>{}.operator() (v, success);
-    }
-
-    T operator () (std::intmax_t v, bool * success) const noexcept
-    {
-        // Overflow
-        if (static_cast<std::uintmax_t>(v) > std::numeric_limits<T>::max()) {
-            *success = false;
-            return this->operator() ();
-        }
-
-        return lexical_cast<std::intmax_t>{}.operator() (v, success);
-    }
-
-    T operator () (double v, bool * success) const noexcept
-    {
-        auto x = lexical_cast<std::intmax_t>{}.operator() (v, success);
-        return this->operator() (x, success);
-    }
-
-    T operator () (pfs::string_view const & v, bool * success) const noexcept
-    {
-        auto x = lexical_cast<std::intmax_t>{}.operator() (v, success);
-        return this->operator() (x, success);
-    }
-
-    T operator () (std::size_t size, bool is_array, bool * success) const noexcept
-    {
-        auto x = lexical_cast<std::intmax_t>{}.operator() (size, is_array, success);
-        return this->operator() (x, success);
-    }
-
-    T operator () (char const * s,  bool * success) const noexcept
-    {
-        auto x = lexical_cast<std::intmax_t>{}.operator() (s, success);
-        return this->operator() (x, success);
-    }
-};
-
-template <typename T>
-struct lexical_cast<T, typename
-        std::enable_if<
-            std::is_floating_point<pfs::remove_cvref_t<T>>::value
-            && !std::is_same<double, pfs::remove_cvref_t<T>>::value>::type>
-{
-    T operator () () const noexcept
-    {
-        return lexical_cast<double>{}.operator() ();
-    }
-
-    T operator () (std::nullptr_t, bool * success) const noexcept
-    {
-        return lexical_cast<double>{}.operator() (nullptr, success);
-    }
-
-    T operator () (bool v, bool * success) const noexcept
-    {
-        return lexical_cast<double>{}.operator() (v, success);
-    }
-
-    T operator () (std::intmax_t v, bool * success) const noexcept
-    {
-        return lexical_cast<double>{}.operator() (v, success);
-    }
-
-    T operator () (double v, bool * success) const noexcept
-    {
-        if (v < std::numeric_limits<T>::min() || v > std::numeric_limits<T>::max()) {
-            *success = false;
-            return this->operator() ();
-        }
-
-        return lexical_cast<double>{}.operator() (v, success);
-    }
-
-    T operator () (pfs::string_view const & v, bool * success) const noexcept
-    {
-        auto x = lexical_cast<double>{}.operator() (v, success);
-        return this->operator() (x, success);
-    }
-
-    T operator () (std::size_t size, bool is_array, bool * success) const noexcept
-    {
-        auto x = lexical_cast<double>{}.operator() (size, is_array, success);
-        return this->operator() (x, success);
-    }
-
-    T operator () (char const * s,  bool * success) const noexcept
-    {
-        auto x = lexical_cast<double>{}.operator() (s, success);
-        return this->operator() (x, success);
-    }
-};
-
 template <typename Backend>
 class element_accessor_interface
 {
@@ -372,7 +537,7 @@ private:
     bool bool_value () const noexcept;
     std::intmax_t integer_value () const noexcept;
     double real_value () const noexcept;
-    pfs::string_view string_value () const noexcept;
+    string_view string_value () const noexcept;
     std::size_t array_size () const noexcept;
     std::size_t object_size () const noexcept;
 
@@ -419,7 +584,7 @@ public:
      * Returns a reference to the value that is mapped to a key equivalent
      * to @a key, performing an insertion if such key does not already exist.
      */
-    reference operator [] (pfs::string_view key) noexcept;
+    reference operator [] (string_view const & key) noexcept;
     reference operator [] (key_type const & key) noexcept;
     reference operator [] (char const * key) noexcept;
 
@@ -428,7 +593,7 @@ public:
      * to @a key. In case of out of range, the result is a reference to an
      * invalid value.
      */
-    const_reference operator [] (pfs::string_view key) const noexcept;
+    const_reference operator [] (string_view const & key) const noexcept;
     const_reference operator [] (key_type const & key) const noexcept;
     const_reference operator [] (char const * key) const noexcept;
 
@@ -462,7 +627,7 @@ public:
      *        or it is not an object.
      * @throw @c error { @c errc::out_of_range } if an element by @a key not found.
      */
-    reference at (pfs::string_view key) const;
+    reference at (string_view const & key) const;
     reference at (key_type const & key) const;
     reference at (char const * key) const;
 
@@ -475,29 +640,29 @@ public:
     template <typename T>
     T get (bool & success) const noexcept
     {
-        lexical_cast<T> cast;
+        decoder<T> decode;
         auto self = reinterpret_cast<traits_interface<Backend> const *>(this);
         success = true;
 
         if (self->is_bool()) {
-            return cast(bool_value(), & success);
+            return decode(bool_value(), & success);
         } else if (self->is_integer()) {
-            return cast(integer_value(), & success);
+            return decode(integer_value(), & success);
         } else if (self->is_real()) {
-            return cast(real_value(), & success);
+            return decode(real_value(), & success);
         } else if (self->is_string()) {
-            return cast(string_value(), & success);
+            return decode(string_value(), & success);
         } else if (self->is_array()) {
-            return cast(array_size(), true, & success);
+            return decode(array_size(), true, & success);
         } else if (self->is_object()) {
-            return cast(object_size(), true, & success);
+            return decode(object_size(), true, & success);
         } else if (self->is_null()) {
-            return cast(nullptr, & success);
+            return decode(nullptr, & success);
         } else {
             success = false;
         }
 
-        return cast();
+        return decode();
     }
 
     /**
@@ -557,6 +722,24 @@ public:
 private:
     json_ref ();
 
+    void assign_helper (std::nullptr_t);
+    void assign_helper (bool);
+    void assign_helper (std::intmax_t);
+    void assign_helper (double);
+    void assign_helper (string_view const & s);
+
+    void assign_helper (std::string const & s)
+    {
+        assign_helper(string_view{s});
+    }
+
+    void assign_helper (char const * s)
+    {
+        assign_helper(string_view{s});
+    }
+
+    void assign_helper (json<Backend> const & j);
+
 public:
     json_ref (typename Backend::ref &&);
     json_ref (json_ref &&);
@@ -564,6 +747,21 @@ public:
 
     /// Check if JSON reference is valid.
     operator bool () const noexcept;
+
+    template <typename T>
+    json_ref & operator = (T const & value)
+    {
+        encoder<T> encode;
+        this->assign_helper(encode(value));
+        return *this;
+    }
+
+    json_ref & operator = (char const * s)
+    {
+        encoder<char const *> encode;
+        this->assign_helper(encode(s));
+        return *this;
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -577,6 +775,8 @@ class json: public Backend::rep
     , public converter_interface<Backend>
     , public element_accessor_interface<Backend>
 {
+    using rep_type = typename Backend::rep;
+
 public:
     using value_type      = json;
     using size_type       = typename Backend::size_type;
@@ -586,7 +786,23 @@ public:
     using const_reference = json_ref<Backend> const;
 
 private:
-    using rep_type = typename Backend::rep;
+    void assign_helper (std::nullptr_t);
+    void assign_helper (bool);
+    void assign_helper (std::intmax_t);
+    void assign_helper (double);
+    void assign_helper (string_view const & s);
+
+    void assign_helper (std::string const & s)
+    {
+        assign_helper(string_view{s});
+    }
+
+    void assign_helper (char const * s)
+    {
+        assign_helper(string_view{s});
+    }
+
+    void assign_helper (json<Backend> const & j);
 
 public:
     /// Check if JSON value is initialized.
@@ -598,40 +814,49 @@ public:
     json ();
 
     /// Construct @c null value.
-    json (std::nullptr_t);
+    explicit json (std::nullptr_t);
 
     /// Construct boolean value.
-    json (bool value);
+    explicit json (bool value);
 
     /// Construct integer value.
-    json (std::intmax_t value);
+    explicit json (std::intmax_t value);
 
     /// Construct from any integral type (bool, char, int, etc).
     template <typename T>
-    json (T x, typename std::enable_if<std::is_integral<T>::value>::type * = 0)
+    explicit json (T x, typename std::enable_if<std::is_integral<T>::value>::type * = 0)
         : json(static_cast<std::intmax_t>(x))
     {}
 
     /// Construct real value from @c double.
-    json (double value);
+    explicit json (double value);
 
     /// Construct from any floating point type.
     template <typename T>
-    json (T x, typename std::enable_if<std::is_floating_point<T>::value>::type * = 0)
+    explicit json (T x, typename std::enable_if<std::is_floating_point<T>::value>::type * = 0)
         : json(static_cast<double>(x))
     {}
 
     /// Construct string value.
-    json (string_type const & value);
+    explicit json (string_view const & s);
+
+    /// Construct string value.
+    explicit json (string_type const & value)
+        : json(string_view{value})
+    {}
 
     /// Construct string value from C-like string.
-    json (char const * value);
+    explicit json (char const * value)
+        : json(string_view{value})
+    {}
 
     /**
      * Construct string value from character sequence with length @a n.
      * Value may contain null characters or not be null terminated.
      */
-    json (char const * value, std::size_t n);
+    json (char const * value, std::size_t n)
+        : json(string_view{value, n})
+    {}
 
     json (json const & other);
 
@@ -642,6 +867,21 @@ public:
     json & operator = (json const & other);
 
     json & operator = (json && other);
+
+    template <typename T>
+    json & operator = (T const & value)
+    {
+        encoder<T> encode;
+        this->assign_helper(encode(value));
+        return *this;
+    }
+
+    json & operator = (char const * s)
+    {
+        encoder<char const *> encode;
+        this->assign_helper(encode(s));
+        return *this;
+    }
 
     //--------------------------------------------------------------------------
     // Modifiers

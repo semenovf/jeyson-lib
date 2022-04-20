@@ -48,7 +48,7 @@ struct jansson
 
             index_type () {}
             ~index_type () {}
-        } index;
+        } _index;
 
     public:
         ref ();

@@ -31,15 +31,13 @@ enum class errc
 //     , unbalanced_object_bracket
 //     , bad_member_name
 //     , bad_json_sequence
+
     , backend_error
 
     , out_of_range
     , incopatible_type
     , invalid_argument
     , overflow
-//     , type_error
-//     , type_cast_error
-//     , null_pointer
 };
 
 class error_category : public std::error_category

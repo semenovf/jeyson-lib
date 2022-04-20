@@ -332,12 +332,12 @@ void run_basic_tests ()
     }
 }
 
-void run_lexical_cast_tests ()
+void run_decoder_tests ()
 {
     // nullptr_t
     {
         bool success = true;
-        jeyson::lexical_cast<std::nullptr_t> cast;
+        jeyson::decoder<std::nullptr_t> cast;
 
         CHECK_EQ(cast(nullptr, & success), nullptr);
         CHECK_EQ(cast(true, & success), nullptr);
@@ -358,7 +358,7 @@ void run_lexical_cast_tests ()
     // bool
     {
         bool success = true;
-        jeyson::lexical_cast<bool> cast;
+        jeyson::decoder<bool> cast;
 
         CHECK_EQ(cast(nullptr, & success), false);
         CHECK_EQ(cast(true, & success), true);
@@ -388,7 +388,7 @@ void run_lexical_cast_tests ()
     // std::intmax_t
     {
         bool success = true;
-        jeyson::lexical_cast<std::intmax_t> cast;
+        jeyson::decoder<std::intmax_t> cast;
 
         CHECK_EQ(cast(nullptr, & success), 0);
         CHECK_EQ(cast(true, & success), 1);
@@ -429,7 +429,7 @@ void run_lexical_cast_tests ()
     // char
     {
         bool success = true;
-        jeyson::lexical_cast<char> cast;
+        jeyson::decoder<char> cast;
 
         CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
 
@@ -445,7 +445,7 @@ void run_lexical_cast_tests ()
     // signed char
     {
         bool success = true;
-        jeyson::lexical_cast<signed char> cast;
+        jeyson::decoder<signed char> cast;
 
         CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
     }
@@ -453,7 +453,7 @@ void run_lexical_cast_tests ()
     // unsigned char
     {
         bool success = true;
-        jeyson::lexical_cast<unsigned char> cast;
+        jeyson::decoder<unsigned char> cast;
 
         CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
     }
@@ -461,7 +461,7 @@ void run_lexical_cast_tests ()
     // short
     {
         bool success = true;
-        jeyson::lexical_cast<short> cast;
+        jeyson::decoder<short> cast;
 
         CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
     }
@@ -469,7 +469,7 @@ void run_lexical_cast_tests ()
     // unsigned short
     {
         bool success = true;
-        jeyson::lexical_cast<unsigned short> cast;
+        jeyson::decoder<unsigned short> cast;
 
         CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
     }
@@ -477,7 +477,7 @@ void run_lexical_cast_tests ()
     // int
     {
         bool success = true;
-        jeyson::lexical_cast<int> cast;
+        jeyson::decoder<int> cast;
 
         CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
     }
@@ -485,7 +485,7 @@ void run_lexical_cast_tests ()
     // unsigned int
     {
         bool success = true;
-        jeyson::lexical_cast<unsigned int> cast;
+        jeyson::decoder<unsigned int> cast;
 
         CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
     }
@@ -493,7 +493,7 @@ void run_lexical_cast_tests ()
     // long
     {
         bool success = true;
-        jeyson::lexical_cast<long> cast;
+        jeyson::decoder<long> cast;
 
         CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
     }
@@ -501,7 +501,7 @@ void run_lexical_cast_tests ()
     // unsigned long
     {
         bool success = true;
-        jeyson::lexical_cast<unsigned long> cast;
+        jeyson::decoder<unsigned long> cast;
 
         CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
     }
@@ -510,7 +510,7 @@ void run_lexical_cast_tests ()
     // long long
     {
         bool success = true;
-        jeyson::lexical_cast<long long> cast;
+        jeyson::decoder<long long> cast;
 
         CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
     }
@@ -518,7 +518,7 @@ void run_lexical_cast_tests ()
     // unsigned long long
     {
         bool success = true;
-        jeyson::lexical_cast<unsigned long long> cast;
+        jeyson::decoder<unsigned long long> cast;
 
         CHECK_EQ(cast(std::intmax_t{42}, & success), 42);
     }
@@ -527,7 +527,7 @@ void run_lexical_cast_tests ()
     // double
     {
         bool success = true;
-        jeyson::lexical_cast<double> cast;
+        jeyson::decoder<double> cast;
 
         CHECK_EQ(cast(nullptr, & success), 0.0);
         CHECK_EQ(cast(true, & success), 1.0);
@@ -548,7 +548,7 @@ void run_lexical_cast_tests ()
     // std::string
     {
         bool success = true;
-        jeyson::lexical_cast<std::string> cast;
+        jeyson::decoder<std::string> cast;
 
         CHECK_EQ(cast(nullptr, & success), "");
         CHECK_EQ(cast(true, & success), "true");
@@ -573,6 +573,11 @@ void run_lexical_cast_tests ()
         CHECK_EQ(cast(42, true, & success), "42");
         CHECK_EQ(cast(42, false, & success), "42");
     }
+}
+
+void run_encoder_tests ()
+{
+
 }
 
 template <typename Backend>
@@ -649,10 +654,15 @@ void check_integral_assigment ()
     using json = jeyson::json<Backend>;
 
     {
+        bool success = true;
         json j;
         j = Int{42};
 
         CHECK(j.is_integer());
+        CHECK_EQ(j.template get<Int>(), Int{42});
+        CHECK_EQ(j.template get<Int>(success), Int{42});
+        CHECK_EQ(j.template get_or<Int>(42), Int{42});
+
         CHECK_EQ(jeyson::get<Int>(j), Int{42});
     }
 
@@ -666,28 +676,51 @@ void check_integral_assigment ()
         j.push_back(3.14159);
         j.push_back("hello");
 
-        CHECK_EQ(j[0].is_null(), true);
-        CHECK_EQ(j[1].is_bool(), true);
-        CHECK_EQ(j[2].is_bool(), true);
-        CHECK_EQ(j[3].is_integer(), true);
-        CHECK_EQ(j[4].is_real(), true);
-        CHECK_EQ(j[5].is_string(), true);
+        CHECK(j[0].is_null());
+        CHECK(j[1].is_bool());
+        CHECK(j[2].is_bool());
+        CHECK(j[3].is_integer());
+        CHECK(j[4].is_real());
+        CHECK(j[5].is_string());
 
-        // FIXME
-        //j[0] = Int{42};
+        j[0] = 42;
+        j[1] = 42;
+        j[2] = 42;
+        j[3] = 42;
+        j[4] = 42;
+        j[5] = 42;
+
+        CHECK(j[0].is_integer());
+        CHECK(j[1].is_integer());
+        CHECK(j[2].is_integer());
+        CHECK(j[3].is_integer());
+        CHECK(j[4].is_integer());
+        CHECK(j[5].is_integer());
+
+        CHECK_EQ(j[0].template get<int>(), 42);
+        CHECK_EQ(j[1].template get<int>(), 42);
+        CHECK_EQ(j[2].template get<int>(), 42);
+        CHECK_EQ(j[3].template get<int>(), 42);
+        CHECK_EQ(j[4].template get<int>(), 42);
+        CHECK_EQ(j[5].template get<int>(), 42);
     }
 
     {
         json j;
 
-        // FIXME
-//         j["null"]   = nullptr;
-//         j["false"]  = false;
-//         j["true"]   = true;
-//         j["int"]    = 42;
-//         j["real"]   = 3.14159;
-//         j["string"] = "hello";
+        j["null"]   = nullptr;
+        j["false"]  = false;
+        j["true"]   = true;
+        j["int"]    = 42;
+        j["real"]   = 3.14159;
+        j["string"] = "hello";
 
+        CHECK(j["null"].is_null());
+        CHECK(j["false"].is_bool());
+        CHECK(j["true"].is_bool());
+        CHECK(j["int"].is_integer());
+        CHECK(j["real"].is_real());
+        CHECK(j["string"].is_string());
     }
 }
 
@@ -753,25 +786,26 @@ void run_assignment_tests ()
     check_floating_point_assigment<Backend, float>();
 
 
-    // FIXME Implement assignment
     {
-        json j;
+        // FIXME Need implement assign_helper(json const &)
+//         json j;
 //         j["KEY1"] = json{42};
 //         j["KEY2"] = json{"Hello"};
 //
-//         REQUIRE_EQ(jeyson::get<int>(j["KEY1"]), 42);
-//         REQUIRE_EQ(jeyson::get<std::string>(j["KEY2"]), std::string{"Hello"});
+//
+//         CHECK_EQ(jeyson::get<int>(j["KEY1"]), 42);
+//         CHECK_EQ(jeyson::get<std::string>(j["KEY2"]), std::string{"Hello"});
     }
 
-    // FIXME Implement assignment
     {
-        json j;
-        j.push_back(json{1});
-        j.push_back(json{"?"});
-
-        REQUIRE_EQ(jeyson::get<int>(j[0]), 1);
-        REQUIRE_EQ(jeyson::get<std::string>(j[1]), std::string{"?"});
-
+        // FIXME Need implement assign_helper(json const &)
+//         json j;
+//         j.push_back(json{1});
+//         j.push_back(json{"?"});
+//
+//         REQUIRE_EQ(jeyson::get<int>(j[0]), 1);
+//         REQUIRE_EQ(jeyson::get<std::string>(j[1]), std::string{"?"});
+//
 //         j[0] = json{42};
 //         j[1] = json{"Hello"};
 //
@@ -838,7 +872,8 @@ void run_parsing_tests ()
 
 TEST_CASE("JSON Jansson backend") {
     run_basic_tests<jeyson::backend::jansson>();
-    run_lexical_cast_tests();
+    run_decoder_tests();
+    run_encoder_tests();
     run_assignment_tests<jeyson::backend::jansson>();
     run_access_tests<jeyson::backend::jansson>();
     run_parsing_tests<jeyson::backend::jansson>();
