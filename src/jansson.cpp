@@ -83,6 +83,21 @@ jansson::rep::~rep ()
 ////////////////////////////////////////////////////////////////////////////////
 jansson::ref::ref () = default;
 
+jansson::ref::ref (ref const & other)
+{
+    if (other._ptr)
+        _ptr = json_incref(other._ptr);
+
+    if (other._parent) {
+        _parent = json_incref(other._parent);
+
+        if (json_is_object(_parent))
+            new (& _index.key) key_type(std::move(other._index.key));
+        else
+            _index.i = other._index.i;
+    }
+}
+
 jansson::ref::ref (ref && other)
 {
     _ptr = other._ptr;
@@ -506,6 +521,9 @@ operator == (json<BACKEND> const & lhs, json<BACKEND> const & rhs)
 ////////////////////////////////////////////////////////////////////////////////
 template <>
 json_ref<BACKEND>::json_ref () = default;
+
+template <>
+json_ref<BACKEND>::json_ref (json_ref const &) = default;
 
 template <>
 json_ref<BACKEND>::json_ref (json_ref &&) = default;
