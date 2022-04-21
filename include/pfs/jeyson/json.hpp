@@ -12,6 +12,7 @@
 #include "pfs/optional.hpp"
 #include "pfs/string_view.hpp"
 #include "pfs/type_traits.hpp"
+#include "backend/jansson.hpp"
 #include <string>
 #include <type_traits>
 #include <cstddef>
@@ -701,7 +702,7 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 // JSON reference
 ////////////////////////////////////////////////////////////////////////////////
-template <typename Backend>
+template <typename Backend = backend::jansson>
 class json_ref: public Backend::ref
     , public traits_interface<Backend>
     , public modifiers_interface<Backend>
@@ -768,7 +769,7 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 // JSON value
 ////////////////////////////////////////////////////////////////////////////////
-template <typename Backend>
+template <typename Backend = backend::jansson>
 class json: public Backend::rep
     , public traits_interface<Backend>
     , public modifiers_interface<Backend>
