@@ -523,6 +523,59 @@ public:
 };
 
 ////////////////////////////////////////////////////////////////////////////////
+// Mutable element access interface
+////////////////////////////////////////////////////////////////////////////////
+template <typename Backend, bool IsRef>
+class mutable_element_accessor_interface
+{
+public:
+    using size_type = typename Backend::size_type;
+    using key_type = typename Backend::key_type;
+    using reference = json_ref<Backend>;
+
+public:
+    /**
+     * Returns a reference to the element at specified location @a pos.
+     * In case of out of bounds, the result is a reference to an invalid value.
+     */
+    reference operator [] (size_type pos) noexcept;
+
+    /**
+     * Returns a reference to the element at specified location @a pos.
+     *
+     * @note This overloaded methods needs to avoid ambiguity for zero (0) index.
+     */
+//     template <typename IndexT = int>
+//     typename std::enable_if<std::is_integral<IndexT>::value
+//         && !std::is_same<size_type, IndexT>::value, reference>::type
+//     operator [] (IndexT pos) noexcept
+//     {
+//         return this->operator[] (static_cast<size_type>(pos));
+//     }
+
+    reference operator [] (int pos) noexcept
+    {
+        return this->operator[] (static_cast<size_type>(pos));
+    }
+
+    /**
+     * Returns a reference to the value that is mapped to a key equivalent
+     * to @a key, performing an insertion if such key does not already exist.
+     */
+    reference operator [] (string_view const & key) noexcept;
+
+    reference operator [] (key_type const & key) noexcept
+    {
+        return this->operator[] (string_view{key});
+    }
+
+    reference operator [] (char const * key) noexcept
+    {
+        return this->operator[] (string_view{key});
+    }
+};
+
+////////////////////////////////////////////////////////////////////////////////
 // Element access interface
 ////////////////////////////////////////////////////////////////////////////////
 template <typename Backend>
@@ -534,21 +587,7 @@ public:
     using reference = json_ref<Backend>;
     using const_reference = json_ref<Backend> const;
 
-private:
-    bool bool_value () const noexcept;
-    std::intmax_t integer_value () const noexcept;
-    double real_value () const noexcept;
-    string_view string_value () const noexcept;
-    std::size_t array_size () const noexcept;
-    std::size_t object_size () const noexcept;
-
 public:
-    /**
-     * Returns a reference to the element at specified location @a pos.
-     * In case of out of bounds, the result is a reference to an invalid value.
-     */
-    reference operator [] (size_type pos) noexcept;
-
     /**
      * Returns a constant reference to the element at specified location @a pos.
      * In case of out of bounds, the result is a reference to an invalid value.
@@ -556,38 +595,21 @@ public:
     const_reference operator [] (size_type pos) const noexcept;
 
     /**
-     * Returns a reference to the element at specified location @a pos.
-     *
-     * @note This overloaded methods needs to avoid ambiguity for zero (0) index.
-     */
-    template <typename IndexT = int>
-    typename std::enable_if<std::is_integral<IndexT>::value
-        && !std::is_same<size_type, IndexT>::value, reference>::type
-    operator [] (IndexT pos) noexcept
-    {
-        return this->operator[] (static_cast<size_type>(pos));
-    }
-
-    /**
      * Returns a constant reference to the element at specified location @a pos.
      *
      * @note This overloaded methods needs to avoid ambiguity for zero (0) index
      */
-    template <typename IndexT = int>
-    typename std::enable_if<std::is_integral<IndexT>::value
-        && !std::is_same<size_type, IndexT>::value, const_reference>::type
-    operator [] (IndexT pos) const noexcept
+//     template <typename IndexT = int>
+//     typename std::enable_if<std::is_integral<IndexT>::value
+//         && !std::is_same<size_type, IndexT>::value, const_reference>::type
+//     operator [] (IndexT pos) const noexcept
+//     {
+//         return this->operator[] (static_cast<size_type>(pos));
+//     }
+    const_reference operator [] (int pos) const noexcept
     {
         return this->operator[] (static_cast<size_type>(pos));
     }
-
-    /**
-     * Returns a reference to the value that is mapped to a key equivalent
-     * to @a key, performing an insertion if such key does not already exist.
-     */
-    reference operator [] (string_view const & key) noexcept;
-    reference operator [] (key_type const & key) noexcept;
-    reference operator [] (char const * key) noexcept;
 
     /**
      * Returns a reference to the value that is mapped to a key equivalent
@@ -595,8 +617,16 @@ public:
      * invalid value.
      */
     const_reference operator [] (string_view const & key) const noexcept;
-    const_reference operator [] (key_type const & key) const noexcept;
-    const_reference operator [] (char const * key) const noexcept;
+
+    const_reference operator [] (key_type const & key) const noexcept
+    {
+        return this->operator[] (string_view{key});
+    }
+
+    const_reference operator [] (char const * key) const noexcept
+    {
+        return this->operator[] (string_view{key});
+    }
 
     /**
      * Returns a reference to the element at specified location @a pos.
@@ -629,9 +659,39 @@ public:
      * @throw @c error { @c errc::out_of_range } if an element by @a key not found.
      */
     reference at (string_view const & key) const;
-    reference at (key_type const & key) const;
-    reference at (char const * key) const;
 
+    reference at (key_type const & key) const
+    {
+        return at(string_view{key});
+    }
+
+    reference at (char const * key) const
+    {
+        return at(string_view{key});
+    }
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Getter interface
+////////////////////////////////////////////////////////////////////////////////
+template <typename Backend>
+class getter_interface
+{
+public:
+    using size_type = typename Backend::size_type;
+    using key_type = typename Backend::key_type;
+    using reference = json_ref<Backend>;
+    using const_reference = json_ref<Backend> const;
+
+private:
+    bool bool_value () const noexcept;
+    std::intmax_t integer_value () const noexcept;
+    double real_value () const noexcept;
+    string_view string_value () const noexcept;
+    std::size_t array_size () const noexcept;
+    std::size_t object_size () const noexcept;
+
+public:
     /**
      * Returns the value stored in JSON value/reference.
      *
@@ -708,13 +768,17 @@ class json_ref: public Backend::ref
     , public modifiers_interface<Backend>
     , public capacity_interface<Backend>
     , public converter_interface<Backend>
+    , public mutable_element_accessor_interface<Backend, true>
     , public element_accessor_interface<Backend>
+    , public getter_interface<Backend>
 {
     friend class json<Backend>;
+    friend class mutable_element_accessor_interface<Backend, true>;
+    friend class mutable_element_accessor_interface<Backend, false>;
     friend class element_accessor_interface<Backend>;
 
 public:
-    using ref_type  = typename Backend::ref;
+    using rep_type  = typename Backend::ref;
     using size_type = typename Backend::size_type;
     using key_type  = typename Backend::key_type;
     using reference       = json_ref<Backend>;
@@ -740,6 +804,10 @@ private:
     }
 
     void assign_helper (json<Backend> const & j);
+
+public:
+    using mutable_element_accessor_interface<Backend, true>::operator [];
+    using element_accessor_interface<Backend>::operator [];
 
 public:
     json_ref (typename Backend::ref &&);
@@ -775,11 +843,12 @@ class json: public Backend::rep
     , public modifiers_interface<Backend>
     , public capacity_interface<Backend>
     , public converter_interface<Backend>
+    , public mutable_element_accessor_interface<Backend, false>
     , public element_accessor_interface<Backend>
+    , public getter_interface<Backend>
 {
-    using rep_type = typename Backend::rep;
-
 public:
+    using rep_type        = typename Backend::rep;
     using value_type      = json;
     using size_type       = typename Backend::size_type;
     using string_type     = typename Backend::string_type;
@@ -805,6 +874,10 @@ private:
     }
 
     void assign_helper (json<Backend> const & j);
+
+public:
+    using mutable_element_accessor_interface<Backend, false>::operator [];
+    using element_accessor_interface<Backend>::operator [];
 
 public:
     /// Check if JSON value is initialized.

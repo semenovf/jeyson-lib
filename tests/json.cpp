@@ -870,6 +870,41 @@ void run_parsing_tests ()
     }
 }
 
+template <typename Backend>
+void run_serializer_tests ()
+{
+    using json = jeyson::json<Backend>;
+
+    json j;
+
+    j = nullptr;
+
+    j["messenger"]["font"]["family"]    = nullptr;
+    j["messenger"]["font"]["pixelSize"] = nullptr;
+    j["messenger"]["font"]["weight"]    = nullptr;
+    j["messenger"]["font"]["italic"]    = nullptr;
+
+    j["messenger"]["balloon"]["back"]["color"]["mine"]     = "#5d90c2";
+    j["messenger"]["balloon"]["back"]["color"]["opponent"] = "#e0e0e0";
+    j["messenger"]["balloon"]["fore"]["color"]["mine"]     = "#f8f8f8";
+    j["messenger"]["balloon"]["fore"]["color"]["opponent"] = "#333333";
+
+    CHECK(j["messenger"]["font"]["family"].is_null());
+    CHECK(j["messenger"]["font"]["pixelSize"].is_null());
+    CHECK(j["messenger"]["font"]["weight"].is_null());
+    CHECK(j["messenger"]["font"]["italic"].is_null());
+
+    CHECK_EQ(j["messenger"]["balloon"]["back"]["color"]["mine"].template get<std::string>(), "#5d90c2");
+    CHECK_EQ(j["messenger"]["balloon"]["back"]["color"]["opponent"].template get<std::string>(), "#e0e0e0");
+    CHECK_EQ(j["messenger"]["balloon"]["fore"]["color"]["mine"].template get<std::string>(), "#f8f8f8");
+    CHECK_EQ(j["messenger"]["balloon"]["fore"]["color"]["opponent"].template get<std::string>(), "#333333");
+
+    auto text = to_string(j);
+
+    CHECK_EQ(text, R"({"messenger":{"font":{"family":null,"pixelSize":null,"weight":null,"italic":null},"balloon":{"back":{"color":{"mine":"#5d90c2","opponent":"#e0e0e0"}},"fore":{"color":{"mine":"#f8f8f8","opponent":"#333333"}}}}})");
+    // fmt::print("{}\n", text);
+}
+
 TEST_CASE("JSON Jansson backend") {
     run_basic_tests<jeyson::backend::jansson>();
     run_decoder_tests();
@@ -877,4 +912,5 @@ TEST_CASE("JSON Jansson backend") {
     run_assignment_tests<jeyson::backend::jansson>();
     run_access_tests<jeyson::backend::jansson>();
     run_parsing_tests<jeyson::backend::jansson>();
+    run_serializer_tests<jeyson::backend::jansson>();
 }

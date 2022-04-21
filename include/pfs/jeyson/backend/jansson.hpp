@@ -24,11 +24,14 @@ struct jansson
     using string_type = std::string;
     using key_type    = std::string;
 
-    class rep
+    class basic_rep
     {
     public:
         json_t * _ptr {nullptr};
+    };
 
+    class rep : public basic_rep
+    {
     public:
         rep ();
         rep (rep const & other);
@@ -37,7 +40,7 @@ struct jansson
         ~rep ();
     };
 
-    class ref: public rep
+    class ref: public basic_rep
     {
     public:
         json_t * _parent {nullptr};

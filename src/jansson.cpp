@@ -23,8 +23,8 @@ namespace jeyson {
 #define BACKEND backend::jansson
 
 #define NATIVE(x) ((x)._ptr)
-#define INATIVE(x) (reinterpret_cast<BACKEND::rep *>(& x)->_ptr)
-#define CINATIVE(x) (reinterpret_cast<BACKEND::rep const *>(& x)->_ptr)
+#define INATIVE(x) (reinterpret_cast<BACKEND::basic_rep *>(& x)->_ptr)
+#define CINATIVE(x) (reinterpret_cast<BACKEND::basic_rep const *>(& x)->_ptr)
 
 static_assert(std::numeric_limits<std::intmax_t>::max()
     == std::numeric_limits<json_int_t>::max()
@@ -66,9 +66,10 @@ jansson::rep::rep (rep && other)
     }
 }
 
-jansson::rep::rep (json_t * p)
-    : _ptr(p)
-{}
+jansson::rep::rep (json_t * p) : basic_rep()
+{
+    _ptr = p;
+}
 
 jansson::rep::~rep ()
 {
@@ -903,7 +904,7 @@ converter_interface<BACKEND>::to_string () const
 
     if (CINATIVE(*this)) {
         auto rc = json_dump_callback(CINATIVE(*this)
-            , json_dump_callback, & result, JSON_COMPACT);
+            , json_dump_callback, & result, JSON_COMPACT | JSON_ENCODE_ANY);
 
         if (rc != 0) {
             error err{errc::backend_error, "stringification failure"};
@@ -1224,96 +1225,20 @@ decoder<std::string>::operator () (std::size_t size, bool, bool *) const noexcep
     return std::to_string(size);
 }
 
-//------------------------------------------------------------------------------
-// Encoder (string)
-//------------------------------------------------------------------------------
-// template <>
-// bool
-// encoder<string_view>::to_bool (string_view const & s) const noexcept
-// {}
-//
-// template <>
-// std::intmax_t
-// encoder<string_view>::to_intmax (string_view const & s) const noexcept
-// {}
-//
-// template <>
-// double
-// encoder<string_view>::to_real (string_view const & n) const noexcept
-// {}
-//
-// template <>
-// bool
-// encoder<std::string>::to_bool (std::string const & s) const noexcept
-// {}
-//
-// template <>
-// std::intmax_t
-// encoder<std::string>::to_intmax (std::string const & s) const noexcept
-// {}
-//
-// template <>
-// double
-// encoder<std::string>::to_real (std::string const & n) const noexcept
-// {}
-
 ////////////////////////////////////////////////////////////////////////////////
-// Element accessor interface
+// Mutabl element accessor interface
 ////////////////////////////////////////////////////////////////////////////////
 template <>
-bool
-element_accessor_interface<BACKEND>::bool_value () const noexcept
+mutable_element_accessor_interface<BACKEND, true>::reference
+mutable_element_accessor_interface<BACKEND, true>::operator [] (size_type pos) noexcept
 {
-    JEYSON__ASSERT(json_is_boolean(CINATIVE(*this)), "Boolean value expected");
-    return json_is_true(CINATIVE(*this)) ? true : false;
-}
+    if (!INATIVE(*this))
+        backend::assign(*reinterpret_cast<BACKEND::ref *>(this), json_array());
 
-template <>
-std::intmax_t
-element_accessor_interface<BACKEND>::integer_value () const noexcept
-{
-    JEYSON__ASSERT(json_is_integer(CINATIVE(*this)), "Integer value expected");
-    return static_cast<std::intmax_t>(json_integer_value(CINATIVE(*this)));
-}
+    if (json_is_null(INATIVE(*this)))
+        backend::assign(*reinterpret_cast<BACKEND::ref *>(this), json_array());
 
-template <>
-double
-element_accessor_interface<BACKEND>::real_value () const noexcept
-{
-    JEYSON__ASSERT(json_is_real(CINATIVE(*this)), "Real value expected");
-    return json_real_value(CINATIVE(*this));
-}
-
-template <>
-string_view
-element_accessor_interface<BACKEND>::string_value () const noexcept
-{
-    JEYSON__ASSERT(json_is_string(CINATIVE(*this)), "String value expected");
-    return string_view(json_string_value(CINATIVE(*this))
-        , json_string_length(CINATIVE(*this)));
-}
-
-template <>
-std::size_t
-element_accessor_interface<BACKEND>::array_size () const noexcept
-{
-    JEYSON__ASSERT(json_is_array(CINATIVE(*this)), "Array expected");
-    return json_array_size(CINATIVE(*this));
-}
-
-template <>
-std::size_t
-element_accessor_interface<BACKEND>::object_size () const noexcept
-{
-    JEYSON__ASSERT(json_is_object(CINATIVE(*this)), "Object expected");
-    return json_object_size(CINATIVE(*this));
-}
-
-template <>
-element_accessor_interface<BACKEND>::reference
-element_accessor_interface<BACKEND>::operator [] (size_type pos) noexcept
-{
-    if (!INATIVE(*this) || !json_is_array(INATIVE(*this)))
+    if (!json_is_array(INATIVE(*this)))
         return reference{};
 
     if (pos >= json_array_size(INATIVE(*this))) {
@@ -1333,6 +1258,104 @@ element_accessor_interface<BACKEND>::operator [] (size_type pos) noexcept
 }
 
 template <>
+mutable_element_accessor_interface<BACKEND, true>::reference
+mutable_element_accessor_interface<BACKEND, true>::operator [] (string_view const & key) noexcept
+{
+    if (!INATIVE(*this))
+        backend::assign(*reinterpret_cast<BACKEND::ref *>(this), json_object());
+
+    if (json_is_null(INATIVE(*this)))
+        backend::assign(*reinterpret_cast<BACKEND::ref *>(this), json_object());
+
+    if (!json_is_object(INATIVE(*this)))
+        return reference{};
+
+    // Return borrowed reference.
+    auto ptr = json_object_getn(INATIVE(*this), key.data(), key.length());
+
+    // Not found, insert new `null` element
+    if (!ptr) {
+        auto rc = json_object_setn_new_nocheck(INATIVE(*this)
+            , key.data(), key.length(), json_null());
+
+        if (rc != 0)
+            return reference{};
+
+        // Return borrowed reference.
+        ptr = json_object_getn(INATIVE(*this), key.data(), key.length());
+
+        JEYSON__ASSERT(ptr, "");
+    }
+
+    return reference{BACKEND::ref{ptr, INATIVE(*this), key_type(key.data(), key.length())}};
+}
+
+template <>
+mutable_element_accessor_interface<BACKEND, false>::reference
+mutable_element_accessor_interface<BACKEND, false>::operator [] (size_type pos) noexcept
+{
+    if (!INATIVE(*this))
+        backend::assign(*reinterpret_cast<BACKEND::rep *>(this), json_array());
+
+    if (json_is_null(INATIVE(*this)))
+        backend::assign(*reinterpret_cast<BACKEND::rep *>(this), json_array());
+
+    if (!json_is_array(INATIVE(*this)))
+        return reference{};
+
+    if (pos >= json_array_size(INATIVE(*this))) {
+        // Fill with null values
+        while (json_array_size(INATIVE(*this)) <= pos) {
+            auto rc = json_array_append_new(INATIVE(*this), json_null());
+            JEYSON__ASSERT(rc == 0, "json_array_append_new() failure");
+        }
+    }
+
+    auto ptr = json_array_get(INATIVE(*this), pos);
+
+    if (!ptr)
+        return reference{};
+
+    return reference{BACKEND::ref{ptr, INATIVE(*this), pos}};
+}
+
+template <>
+mutable_element_accessor_interface<BACKEND, false>::reference
+mutable_element_accessor_interface<BACKEND, false>::operator [] (string_view const & key) noexcept
+{
+    if (!INATIVE(*this))
+        backend::assign(*reinterpret_cast<BACKEND::rep *>(this), json_object());
+
+    if (json_is_null(INATIVE(*this)))
+        backend::assign(*reinterpret_cast<BACKEND::rep *>(this), json_object());
+
+    if (!json_is_object(INATIVE(*this)))
+        return reference{};
+
+    // Return borrowed reference.
+    auto ptr = json_object_getn(INATIVE(*this), key.data(), key.length());
+
+    // Not found, insert new `null` element
+    if (!ptr) {
+        auto rc = json_object_setn_new_nocheck(INATIVE(*this)
+            , key.data(), key.length(), json_null());
+
+        if (rc != 0)
+            return reference{};
+
+        // Return borrowed reference.
+        ptr = json_object_getn(INATIVE(*this), key.data(), key.length());
+
+        JEYSON__ASSERT(ptr, "");
+    }
+
+    return reference{BACKEND::ref{ptr, INATIVE(*this), key_type(key.data(), key.length())}};
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Element accessor interface
+////////////////////////////////////////////////////////////////////////////////
+template <>
 element_accessor_interface<BACKEND>::const_reference
 element_accessor_interface<BACKEND>::operator [] (size_type pos) const noexcept
 {
@@ -1345,48 +1368,6 @@ element_accessor_interface<BACKEND>::operator [] (size_type pos) const noexcept
         return reference{};
 
     return reference{BACKEND::ref{ptr, CINATIVE(*this), pos}};
-}
-
-template <>
-element_accessor_interface<BACKEND>::reference
-element_accessor_interface<BACKEND>::operator [] (string_view const & key) noexcept
-{
-    if (!INATIVE(*this))
-        INATIVE(*this) = json_object();
-
-    if (!json_is_object(INATIVE(*this)))
-        return reference{};
-
-    auto ptr = json_object_getn(INATIVE(*this), key.data(), key.length());
-
-    // Not found, insert new `null` element
-    if (!ptr) {
-        auto rc = json_object_setn_new_nocheck(INATIVE(*this)
-            , key.data(), key.length(), json_null());
-
-        if (rc != 0)
-            return reference{};
-
-        auto ptr = json_object_getn(INATIVE(*this), key.data(), key.length());
-
-        JEYSON__ASSERT(ptr, "");
-    }
-
-    return reference{BACKEND::ref{ptr, INATIVE(*this), key_type(key.data(), key.length())}};
-}
-
-template <>
-element_accessor_interface<BACKEND>::reference
-element_accessor_interface<BACKEND>::operator [] (key_type const & key) noexcept
-{
-    return this->operator[] (string_view{key});
-}
-
-template <>
-element_accessor_interface<BACKEND>::reference
-element_accessor_interface<BACKEND>::operator [] (char const * key) noexcept
-{
-    return this->operator[] (string_view{key});
 }
 
 template <>
@@ -1403,38 +1384,6 @@ element_accessor_interface<BACKEND>::operator [] (string_view const & key) const
         return reference{};
 
     return reference{BACKEND::ref{ptr, CINATIVE(*this), key_type(key.data(), key.length())}};
-}
-
-template <>
-element_accessor_interface<BACKEND>::const_reference
-element_accessor_interface<BACKEND>::operator [] (key_type const & key) const noexcept
-{
-    if (!CINATIVE(*this) || !json_is_object(CINATIVE(*this)))
-        return reference{};
-
-    auto ptr = json_object_getn(CINATIVE(*this), key.c_str(), key.size());
-
-    // Not found
-    if (!ptr)
-        return reference{};
-
-    return reference{BACKEND::ref{ptr, CINATIVE(*this), key}};
-}
-
-template <>
-element_accessor_interface<BACKEND>::const_reference
-element_accessor_interface<BACKEND>::operator [] (char const * key) const noexcept
-{
-    if (!CINATIVE(*this) || !json_is_object(CINATIVE(*this)))
-        return reference{};
-
-    auto ptr = json_object_getn(CINATIVE(*this), key, std::strlen(key));
-
-    // Not found
-    if (!ptr)
-        return reference{};
-
-    return reference{BACKEND::ref{ptr, CINATIVE(*this), key_type(key, std::strlen(key))}};
 }
 
 template <>
@@ -1475,26 +1424,56 @@ element_accessor_interface<BACKEND>::at (string_view const & key) const
     return reference{BACKEND::ref{ptr, CINATIVE(*this), key_type(key.data(), key.length())}};
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// Getter interface
+////////////////////////////////////////////////////////////////////////////////
 template <>
-element_accessor_interface<BACKEND>::reference
-element_accessor_interface<BACKEND>::at (key_type const & key) const
+bool
+getter_interface<BACKEND>::bool_value () const noexcept
 {
-    return at(string_view{key});
+    JEYSON__ASSERT(json_is_boolean(CINATIVE(*this)), "Boolean value expected");
+    return json_is_true(CINATIVE(*this)) ? true : false;
 }
 
 template <>
-element_accessor_interface<BACKEND>::reference
-element_accessor_interface<BACKEND>::at (char const * key) const
+std::intmax_t
+getter_interface<BACKEND>::integer_value () const noexcept
 {
-    return at(string_view{key});
+    JEYSON__ASSERT(json_is_integer(CINATIVE(*this)), "Integer value expected");
+    return static_cast<std::intmax_t>(json_integer_value(CINATIVE(*this)));
 }
 
-// template <>
-// json<BACKEND> &
-// json<BACKEND>::operator = (std::nullptr_t)
-// {
-//     json j{nullptr};
-//     this->swap(j);
-//     return *this;
-// }
+template <>
+double
+getter_interface<BACKEND>::real_value () const noexcept
+{
+    JEYSON__ASSERT(json_is_real(CINATIVE(*this)), "Real value expected");
+    return json_real_value(CINATIVE(*this));
+}
+
+template <>
+string_view
+getter_interface<BACKEND>::string_value () const noexcept
+{
+    JEYSON__ASSERT(json_is_string(CINATIVE(*this)), "String value expected");
+    return string_view(json_string_value(CINATIVE(*this))
+        , json_string_length(CINATIVE(*this)));
+}
+
+template <>
+std::size_t
+getter_interface<BACKEND>::array_size () const noexcept
+{
+    JEYSON__ASSERT(json_is_array(CINATIVE(*this)), "Array expected");
+    return json_array_size(CINATIVE(*this));
+}
+
+template <>
+std::size_t
+getter_interface<BACKEND>::object_size () const noexcept
+{
+    JEYSON__ASSERT(json_is_object(CINATIVE(*this)), "Object expected");
+    return json_object_size(CINATIVE(*this));
+}
+
 } // namespace jeyson
