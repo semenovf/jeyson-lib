@@ -56,6 +56,7 @@ struct jansson
 
         ref (json_t * ptr, json_t * parent, size_type index);
         ref (json_t * ptr, json_t * parent, std::string const & key);
+        ref (ref const &);
         ref (ref &&);
     };
 };

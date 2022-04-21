@@ -742,6 +742,7 @@ private:
 
 public:
     json_ref (typename Backend::ref &&);
+    json_ref (json_ref const &);
     json_ref (json_ref &&);
     ~json_ref ();
 
@@ -1075,13 +1076,13 @@ inline T get (json_ref<Backend> const & j)
 template <typename T, typename Backend>
 inline T get_or (json<Backend> const & j, T const & alt) noexcept
 {
-    return j.template get<T>(alt);
+    return j.template get_or<T>(alt);
 }
 
 template <typename T, typename Backend>
 inline T get_or (json_ref<Backend> const & j, T const & alt) noexcept
 {
-    return j.template get<T>(alt);
+    return j.template get_or<T>(alt);
 }
 
 template <typename Backend>
