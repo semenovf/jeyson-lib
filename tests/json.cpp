@@ -787,30 +787,32 @@ void run_assignment_tests ()
 
 
     {
-        // FIXME Need implement assign_helper(json const &)
-//         json j;
-//         j["KEY1"] = json{42};
-//         j["KEY2"] = json{"Hello"};
-//
-//
-//         CHECK_EQ(jeyson::get<int>(j["KEY1"]), 42);
-//         CHECK_EQ(jeyson::get<std::string>(j["KEY2"]), std::string{"Hello"});
+        json j;
+        j["KEY1"] = json{42};
+        j["KEY2"] = json{"Hello"};
+
+        CHECK_EQ(jeyson::get<int>(j["KEY1"]), 42);
+        CHECK_EQ(jeyson::get<std::string>(j["KEY2"]), std::string{"Hello"});
+
+        json j1 {j["KEY1"]};
+        json j2 {j["KEY2"]};
+        CHECK_EQ(jeyson::get<int>(j1), 42);
+        CHECK_EQ(jeyson::get<std::string>(j2), std::string{"Hello"});
     }
 
     {
-        // FIXME Need implement assign_helper(json const &)
-//         json j;
-//         j.push_back(json{1});
-//         j.push_back(json{"?"});
-//
-//         REQUIRE_EQ(jeyson::get<int>(j[0]), 1);
-//         REQUIRE_EQ(jeyson::get<std::string>(j[1]), std::string{"?"});
-//
-//         j[0] = json{42};
-//         j[1] = json{"Hello"};
-//
-//         REQUIRE_EQ(jeyson::get<int>(j[0]), 42);
-//         REQUIRE_EQ(jeyson::get<std::string>(j[1]), std::string{"Hello"});
+        json j;
+        j.push_back(json{1});
+        j.push_back(json{"?"});
+
+        REQUIRE_EQ(jeyson::get<int>(j[0]), 1);
+        REQUIRE_EQ(jeyson::get<std::string>(j[1]), std::string{"?"});
+
+        j[0] = json{42};
+        j[1] = json{"Hello"};
+
+        REQUIRE_EQ(jeyson::get<int>(j[0]), 42);
+        REQUIRE_EQ(jeyson::get<std::string>(j[1]), std::string{"Hello"});
     }
 
     // Assing to invalid JSON (non-initialized)

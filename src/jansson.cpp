@@ -79,6 +79,12 @@ jansson::rep::~rep ()
     _ptr = nullptr;
 }
 
+inline void swap (jansson::rep & a, jansson::rep & b)
+{
+    using std::swap;
+    swap(a._ptr, b._ptr);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // ref
 ////////////////////////////////////////////////////////////////////////////////
@@ -153,6 +159,36 @@ jansson::ref::~ref ()
         json_decref(_parent);
         _parent = nullptr;
     }
+}
+
+void swap (jansson::ref & a, jansson::ref & b)
+{
+    using std::swap;
+
+    if (json_is_array(a._parent)) {
+        // Both are arrays
+        if (json_is_array(b._parent)) {
+            swap(a._index.i, b._index.i);
+        } else {
+            auto i = a._index.i;
+            new (& a._index.key) std::string(std::move(b._index.key));
+            b._index.key.~basic_string();
+            b._index.i = i;
+        }
+    } else {
+        // Both are objects
+        if (json_is_object(b._parent)) {
+            swap(a._index.key, b._index.key);
+        } else {
+            auto i = b._index.i;
+            new (& b._index.key) std::string(std::move(a._index.key));
+            a._index.key.~basic_string();
+            a._index.i = i;
+        }
+    }
+
+    swap(a._ptr, b._ptr);
+    swap(a._parent, b._parent);
 }
 
 // value must be a new reference
@@ -266,6 +302,14 @@ void push_back (json_t * arr, json_t * value)
 } // namespace backend
 
 ////////////////////////////////////////////////////////////////////////////////
+// JSON reference destructor
+////////////////////////////////////////////////////////////////////////////////
+// Placed here to avoid error: specialization of ‘jeyson::json_ref<Backend>::~json_ref()
+// [with Backend = jeyson::backend::jansson]’ after instantiation
+template <>
+json_ref<BACKEND>::~json_ref () = default;
+
+////////////////////////////////////////////////////////////////////////////////
 // JSON value
 ////////////////////////////////////////////////////////////////////////////////
 template <>
@@ -308,6 +352,19 @@ template <>
 json<BACKEND>::json (json && other) = default;
 
 template <>
+json<BACKEND>::json (json_ref<BACKEND> const & j)
+{
+    backend::assign(*this, json_deep_copy(j._ptr));
+}
+
+template <>
+json<BACKEND>::json (json_ref<BACKEND> && j)
+{
+    backend::assign(*this, json_incref(j._ptr));
+    j.~json_ref<BACKEND>();
+}
+
+template <>
 json<BACKEND>::~json () = default;
 
 template <>
@@ -340,6 +397,23 @@ json<BACKEND>::operator = (json && other)
         }
     }
 
+    return *this;
+}
+
+template <>
+json<BACKEND> &
+json<BACKEND>::operator = (json_ref<BACKEND> const & j)
+{
+    backend::assign(*this, json_deep_copy(j._ptr));
+    return *this;
+}
+
+template <>
+json<BACKEND> &
+json<BACKEND>::operator = (json_ref<BACKEND> && j)
+{
+    backend::assign(*this, json_incref(j._ptr));
+    j.~json_ref<BACKEND>();
     return *this;
 }
 
@@ -388,13 +462,6 @@ json<BACKEND>::assign_helper (string_view const & s)
         json_string_setn_nocheck(_ptr, s.data(), s.size());
 }
 
-template <>
-void
-json<BACKEND>::assign_helper (json const & j)
-{
-    // FIXME
-}
-
 //------------------------------------------------------------------------------
 // Modifiers
 //------------------------------------------------------------------------------
@@ -402,9 +469,7 @@ template <>
 void
 json<BACKEND>::swap (json & other)
 {
-    json_t * tmp = NATIVE(*this);
-    NATIVE(*this) = NATIVE(other);
-    NATIVE(other) = tmp;
+    backend::swap(*this, other);
 }
 
 //------------------------------------------------------------------------------
@@ -535,7 +600,32 @@ json_ref<BACKEND>::json_ref (BACKEND::ref && other)
 {}
 
 template <>
-json_ref<BACKEND>::~json_ref () = default;
+json_ref<BACKEND>::json_ref (json<BACKEND> const & j)
+{
+    backend::assign(*this, json_deep_copy(j._ptr));
+}
+
+template <>
+json_ref<BACKEND>::json_ref (json<BACKEND> && j)
+{
+    backend::assign(*this, j._ptr);
+    j._ptr = nullptr;
+}
+
+template <>
+json_ref<BACKEND> & json_ref<BACKEND>::operator = (json<BACKEND> const & j)
+{
+    backend::assign(*this, json_deep_copy(j._ptr));
+    return *this;
+}
+
+template <>
+json_ref<BACKEND> & json_ref<BACKEND>::operator = (json<BACKEND> && j)
+{
+    backend::assign(*this, j._ptr);
+    j._ptr = nullptr;
+    return *this;
+}
 
 template <>
 json_ref<BACKEND>::operator bool () const noexcept
@@ -578,12 +668,16 @@ json_ref<BACKEND>::assign_helper (string_view const & s)
     backend::assign(*this, json_stringn_nocheck(s.data(), s.size()));
 }
 
+//------------------------------------------------------------------------------
+// Modifiers
+//------------------------------------------------------------------------------
 template <>
 void
-json_ref<BACKEND>::assign_helper (json<BACKEND> const & j)
+json_ref<BACKEND>::swap (json_ref & other)
 {
-    // FIXME
+    backend::swap(*this, other);
 }
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Traits interface

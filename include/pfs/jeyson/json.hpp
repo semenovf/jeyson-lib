@@ -803,8 +803,6 @@ private:
         assign_helper(string_view{s});
     }
 
-    void assign_helper (json<Backend> const & j);
-
 public:
     using mutable_element_accessor_interface<Backend, true>::operator [];
     using element_accessor_interface<Backend>::operator [];
@@ -813,10 +811,15 @@ public:
     json_ref (typename Backend::ref &&);
     json_ref (json_ref const &);
     json_ref (json_ref &&);
+    explicit json_ref (json<Backend> const &);
+    explicit json_ref (json<Backend> &&);
     ~json_ref ();
 
     /// Check if JSON reference is valid.
     operator bool () const noexcept;
+
+    json_ref & operator = (json<Backend> const & j);
+    json_ref & operator = (json<Backend> && j);
 
     template <typename T>
     json_ref & operator = (T const & value)
@@ -832,6 +835,8 @@ public:
         this->assign_helper(encode(s));
         return *this;
     }
+
+    void swap (json_ref & other);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -934,14 +939,16 @@ public:
     {}
 
     json (json const & other);
-
     json (json && other);
+    explicit json (reference const & other);
+    explicit json (reference && other);
 
     ~json ();
 
     json & operator = (json const & other);
-
     json & operator = (json && other);
+    json & operator = (reference const & other);
+    json & operator = (reference && other);
 
     template <typename T>
     json & operator = (T const & value)
