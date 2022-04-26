@@ -818,6 +818,8 @@ public:
     /// Check if JSON reference is valid.
     operator bool () const noexcept;
 
+    json_ref & operator = (json_ref const & j);
+    json_ref & operator = (json_ref && j);
     json_ref & operator = (json<Backend> const & j);
     json_ref & operator = (json<Backend> && j);
 

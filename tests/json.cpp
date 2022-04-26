@@ -791,6 +791,8 @@ void run_assignment_tests ()
         j["KEY1"] = json{42};
         j["KEY2"] = json{"Hello"};
 
+        auto n = jeyson::get<int>(j["KEY1"]);
+
         CHECK_EQ(jeyson::get<int>(j["KEY1"]), 42);
         CHECK_EQ(jeyson::get<std::string>(j["KEY2"]), std::string{"Hello"});
 
@@ -813,6 +815,39 @@ void run_assignment_tests ()
 
         REQUIRE_EQ(jeyson::get<int>(j[0]), 42);
         REQUIRE_EQ(jeyson::get<std::string>(j[1]), std::string{"Hello"});
+    }
+
+    // Copy assignment reference from reference;
+    {
+        json j;
+        j["One"] = 1;
+        j["Two"] = 2;
+
+        CHECK_EQ(jeyson::get<int>(j["One"]), 1);
+        CHECK_EQ(jeyson::get<int>(j["Two"]), 2);
+
+        j["One"] = j["Two"];
+
+        CHECK_EQ(jeyson::get<int>(j["One"]), 2);
+        CHECK_EQ(jeyson::get<int>(j["Two"]), 2);
+    }
+
+    // Move assignment reference from reference;
+    {
+        json j;
+        j["One"] = 1;
+        j["Two"] = 2;
+
+        CHECK_EQ(jeyson::get<int>(j["One"]), 1);
+        CHECK_EQ(jeyson::get<int>(j["Two"]), 2);
+
+        auto ref = j["Two"];
+        CHECK(ref);
+
+        j["One"] = std::move(ref);
+
+        CHECK_EQ(jeyson::get<int>(j["One"]), 2);
+        CHECK_FALSE(ref);
     }
 
     // Assing to invalid JSON (non-initialized)
@@ -881,20 +916,25 @@ void run_serializer_tests ()
 
     j = nullptr;
 
-    j["messenger"]["font"]["family"]    = nullptr;
-    j["messenger"]["font"]["pixelSize"] = nullptr;
-    j["messenger"]["font"]["weight"]    = nullptr;
-    j["messenger"]["font"]["italic"]    = nullptr;
+    j["app"]["font"]["family"]    = "Roboto";
+    j["app"]["font"]["pixelSize"] = 14;
+    j["app"]["font"]["weight"]    = 50;
+    j["app"]["font"]["italic"]    = true;
+
+    j["messenger"]["font"]["family"]    = j["app"]["font"]["family"];
+    j["messenger"]["font"]["pixelSize"] = j["app"]["font"]["pixelSize"];
+    j["messenger"]["font"]["weight"]    = j["app"]["font"]["weight"];
+    j["messenger"]["font"]["italic"]    = j["app"]["font"]["italic"];
 
     j["messenger"]["balloon"]["back"]["color"]["mine"]     = "#5d90c2";
     j["messenger"]["balloon"]["back"]["color"]["opponent"] = "#e0e0e0";
     j["messenger"]["balloon"]["fore"]["color"]["mine"]     = "#f8f8f8";
     j["messenger"]["balloon"]["fore"]["color"]["opponent"] = "#333333";
 
-    CHECK(j["messenger"]["font"]["family"].is_null());
-    CHECK(j["messenger"]["font"]["pixelSize"].is_null());
-    CHECK(j["messenger"]["font"]["weight"].is_null());
-    CHECK(j["messenger"]["font"]["italic"].is_null());
+    CHECK_EQ(j["messenger"]["font"]["family"].template get<std::string>(), "Roboto");
+    CHECK_EQ(j["messenger"]["font"]["pixelSize"].template get<int>(), 14);
+    CHECK_EQ(j["messenger"]["font"]["weight"].template get<int>(), 50);
+    CHECK_EQ(j["messenger"]["font"]["italic"].template get<bool>(), true);
 
     CHECK_EQ(j["messenger"]["balloon"]["back"]["color"]["mine"].template get<std::string>(), "#5d90c2");
     CHECK_EQ(j["messenger"]["balloon"]["back"]["color"]["opponent"].template get<std::string>(), "#e0e0e0");
@@ -903,8 +943,8 @@ void run_serializer_tests ()
 
     auto text = to_string(j);
 
-    CHECK_EQ(text, R"({"messenger":{"font":{"family":null,"pixelSize":null,"weight":null,"italic":null},"balloon":{"back":{"color":{"mine":"#5d90c2","opponent":"#e0e0e0"}},"fore":{"color":{"mine":"#f8f8f8","opponent":"#333333"}}}}})");
-    // fmt::print("{}\n", text);
+    CHECK_EQ(text, R"({"app":{"font":{"family":"Roboto","pixelSize":14,"weight":50,"italic":true}},"messenger":{"font":{"family":"Roboto","pixelSize":14,"weight":50,"italic":true},"balloon":{"back":{"color":{"mine":"#5d90c2","opponent":"#e0e0e0"}},"fore":{"color":{"mine":"#f8f8f8","opponent":"#333333"}}}}})");
+    //fmt::print("{}\n", text);
 }
 
 TEST_CASE("JSON Jansson backend") {

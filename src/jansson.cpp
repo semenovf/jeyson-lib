@@ -361,7 +361,7 @@ template <>
 json<BACKEND>::json (json_ref<BACKEND> && j)
 {
     backend::assign(*this, json_incref(j._ptr));
-    j.~json_ref<BACKEND>();
+    j.~rep_type();
 }
 
 template <>
@@ -608,8 +608,25 @@ json_ref<BACKEND>::json_ref (json<BACKEND> const & j)
 template <>
 json_ref<BACKEND>::json_ref (json<BACKEND> && j)
 {
-    backend::assign(*this, j._ptr);
-    j._ptr = nullptr;
+    backend::assign(*this, json_incref(j._ptr));
+    j.~rep_type();
+}
+
+template <>
+json_ref<BACKEND> &
+json_ref<BACKEND>::operator = (json_ref const & j)
+{
+    backend::assign(*this, json_deep_copy(j._ptr));
+    return *this;
+}
+
+template <>
+json_ref<BACKEND> &
+json_ref<BACKEND>::operator = (json_ref && j)
+{
+    backend::assign(*this, json_incref(j._ptr));
+    j.~rep_type();
+    return *this;
 }
 
 template <>
@@ -622,8 +639,8 @@ json_ref<BACKEND> & json_ref<BACKEND>::operator = (json<BACKEND> const & j)
 template <>
 json_ref<BACKEND> & json_ref<BACKEND>::operator = (json<BACKEND> && j)
 {
-    backend::assign(*this, j._ptr);
-    j._ptr = nullptr;
+    backend::assign(*this, json_incref(j._ptr));
+    j.~rep_type();
     return *this;
 }
 
