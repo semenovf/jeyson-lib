@@ -753,6 +753,11 @@ public:
     template <typename T>
     T get_or (T const & alt) const noexcept
     {
+        auto self = reinterpret_cast<traits_interface<Backend> const *>(this);
+
+        if (self->is_null())
+            return alt;
+
         bool success = true;
         auto result = get<T>(success);
         return success ? result : alt;
