@@ -1535,6 +1535,17 @@ element_accessor_interface<BACKEND>::at (string_view const & key) const
     return reference{BACKEND::ref{ptr, CINATIVE(*this), key_type(key.data(), key.length())}};
 }
 
+template <>
+bool
+element_accessor_interface<BACKEND>::contains (string_view const & key) const
+{
+    if (!CINATIVE(*this) || !json_is_object(CINATIVE(*this)))
+        return false;
+
+    auto ptr = json_object_getn(CINATIVE(*this), key.data(), key.length());
+    return !!ptr;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Getter interface
 ////////////////////////////////////////////////////////////////////////////////
