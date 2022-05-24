@@ -669,6 +669,24 @@ public:
     {
         return at(string_view{key});
     }
+
+    /**
+     * Checks if JSON value contains element by @a key.
+     *
+     * @note This method is applicable only for objects, in other cases it
+     *       returns @c false.
+     */
+    bool contains (string_view const & key) const;
+
+    bool contains (key_type const & key) const
+    {
+        return contains(string_view{key});
+    }
+
+    bool contains (char const * key) const
+    {
+        return contains(string_view{key});
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////

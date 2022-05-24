@@ -360,7 +360,7 @@ json<BACKEND>::json (json_ref<BACKEND> const & j)
 template <>
 json<BACKEND>::json (json_ref<BACKEND> && j)
 {
-    backend::assign(*this, json_incref(j._ptr));
+    backend::assign(*this, json_deep_copy(j._ptr));
     j.~rep_type();
 }
 
@@ -412,7 +412,7 @@ template <>
 json<BACKEND> &
 json<BACKEND>::operator = (json_ref<BACKEND> && j)
 {
-    backend::assign(*this, json_incref(j._ptr));
+    backend::assign(*this, json_deep_copy(j._ptr));
     j.~json_ref<BACKEND>();
     return *this;
 }
@@ -624,7 +624,7 @@ template <>
 json_ref<BACKEND> &
 json_ref<BACKEND>::operator = (json_ref && j)
 {
-    backend::assign(*this, json_incref(j._ptr));
+    backend::assign(*this, json_deep_copy(j._ptr));
     j.~rep_type();
     return *this;
 }
@@ -639,7 +639,7 @@ json_ref<BACKEND> & json_ref<BACKEND>::operator = (json<BACKEND> const & j)
 template <>
 json_ref<BACKEND> & json_ref<BACKEND>::operator = (json<BACKEND> && j)
 {
-    backend::assign(*this, json_incref(j._ptr));
+    backend::assign(*this, json_deep_copy(j._ptr));
     j.~rep_type();
     return *this;
 }
@@ -1533,6 +1533,17 @@ element_accessor_interface<BACKEND>::at (string_view const & key) const
     }
 
     return reference{BACKEND::ref{ptr, CINATIVE(*this), key_type(key.data(), key.length())}};
+}
+
+template <>
+bool
+element_accessor_interface<BACKEND>::contains (string_view const & key) const
+{
+    if (!CINATIVE(*this) || !json_is_object(CINATIVE(*this)))
+        return false;
+
+    auto ptr = json_object_getn(CINATIVE(*this), key.data(), key.length());
+    return !!ptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
