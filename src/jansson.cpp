@@ -5,6 +5,7 @@
 //
 // Changelog:
 //      2022.02.07 Initial version.
+//      2022.07.08 Fixed for MSVC.
 ////////////////////////////////////////////////////////////////////////////////
 #include "pfs/jeyson/json.hpp"
 #include "pfs/jeyson/error.hpp"
@@ -18,16 +19,21 @@
 #include <cctype>
 #include <cstdlib>
 
+#define PFS__LOG_LEVEL 1
+#include <pfs/log.hpp>
+
 namespace jeyson {
 
-#define BACKEND backend::jansson
+using BACKEND  = backend::jansson;
+using JSON     = json<BACKEND>;
+using JSON_REF = json_ref<BACKEND>;
 
 #define NATIVE(x) ((x)._ptr)
 #define INATIVE(x) (reinterpret_cast<BACKEND::basic_rep *>(& x)->_ptr)
 #define CINATIVE(x) (reinterpret_cast<BACKEND::basic_rep const *>(& x)->_ptr)
 
-static_assert(std::numeric_limits<std::intmax_t>::max()
-    == std::numeric_limits<json_int_t>::max()
+static_assert((std::numeric_limits<std::intmax_t>::max)()
+    == (std::numeric_limits<json_int_t>::max)()
     , "");
 
 inline bool case_eq (string_view const & a, string_view const & b)
@@ -254,6 +260,8 @@ void assign (jansson::ref & ref, json_t * value)
                    errc::incopatible_type
                 , "Expected array or object for parent"}));
         }
+    } else {
+        ref._ptr = value;
     }
 }
 
@@ -326,7 +334,9 @@ json<BACKEND>::json () = default;
 
 template <>
 json<BACKEND>::json (std::nullptr_t) : rep_type(json_null())
-{}
+{
+    LOGD("", "json::json::this={}", static_cast<void const*>(this));
+}
 
 template <>
 json<BACKEND>::json (bool value) : rep_type(json_boolean(value))
@@ -345,11 +355,24 @@ json<BACKEND>::json (string_view const & value)
     : rep_type(json_stringn_nocheck(value.data(), value.size()))
 {}
 
+// NOTE. MSVC 2019 (Checked with version 16.11.16):
+// error LNK2019: unresolved external symbol
+#if _MSC_VER
+
+template <>
+json<BACKEND>::json (json const & other)
+    : rep_type(other)
+{}
+
+#else
+
 template <>
 json<BACKEND>::json (json const & other) = default;
 
+#endif
+
 template <>
-json<BACKEND>::json (json && other) = default;
+json<BACKEND>::json(json && other) = default;
 
 template <>
 json<BACKEND>::json (json_ref<BACKEND> const & j)
@@ -361,7 +384,7 @@ template <>
 json<BACKEND>::json (json_ref<BACKEND> && j)
 {
     backend::assign(*this, json_deep_copy(j._ptr));
-    j.~rep_type();
+    j.~json_ref<BACKEND>();
 }
 
 template <>
@@ -600,23 +623,28 @@ json_ref<BACKEND>::json_ref (BACKEND::ref && other)
 {}
 
 template <>
-json_ref<BACKEND>::json_ref (json<BACKEND> const & j)
+json_ref<BACKEND>::json_ref (json<BACKEND> & j)
 {
-    backend::assign(*this, json_deep_copy(j._ptr));
+    if (j._ptr)
+        backend::assign(*this, json_incref(j._ptr));
 }
 
 template <>
 json_ref<BACKEND>::json_ref (json<BACKEND> && j)
 {
-    backend::assign(*this, json_incref(j._ptr));
-    j.~rep_type();
+    if (j._ptr) {
+        backend::assign(*this, json_incref(j._ptr));
+        j.~json<BACKEND>();
+    }
 }
 
 template <>
 json_ref<BACKEND> &
 json_ref<BACKEND>::operator = (json_ref const & j)
 {
-    backend::assign(*this, json_deep_copy(j._ptr));
+    if (j._ptr)
+        backend::assign(*this, json_deep_copy(j._ptr));
+
     return *this;
 }
 
@@ -624,23 +652,31 @@ template <>
 json_ref<BACKEND> &
 json_ref<BACKEND>::operator = (json_ref && j)
 {
-    backend::assign(*this, json_deep_copy(j._ptr));
-    j.~rep_type();
+    if (j._ptr) {
+        backend::assign(*this, json_deep_copy(j._ptr));
+        j.~json_ref();
+    }
+
     return *this;
 }
 
 template <>
 json_ref<BACKEND> & json_ref<BACKEND>::operator = (json<BACKEND> const & j)
 {
-    backend::assign(*this, json_deep_copy(j._ptr));
+    if (j._ptr)
+        backend::assign(*this, json_deep_copy(j._ptr));
+
     return *this;
 }
 
 template <>
 json_ref<BACKEND> & json_ref<BACKEND>::operator = (json<BACKEND> && j)
 {
-    backend::assign(*this, json_deep_copy(j._ptr));
-    j.~rep_type();
+    if (j._ptr) {
+        backend::assign(*this, json_deep_copy(j._ptr));
+        j.~json<BACKEND>();
+    }
+
     return *this;
 }
 
@@ -699,123 +735,176 @@ json_ref<BACKEND>::swap (json_ref & other)
 ////////////////////////////////////////////////////////////////////////////////
 // Traits interface
 ////////////////////////////////////////////////////////////////////////////////
-template <>
-bool
-traits_interface<BACKEND>::is_null () const noexcept
+template <typename Derived>
+bool traits_interface<Derived>::is_null () const noexcept
 {
-    return CINATIVE(*this) ? json_is_null(CINATIVE(*this)) : false;
+    auto self = static_cast<Derived const *>(this);
+    return CINATIVE(*self) ? json_is_null(CINATIVE(*self)) : false;
 }
 
-template <>
+template bool traits_interface<JSON>::is_null() const noexcept;
+template bool traits_interface<JSON_REF>::is_null() const noexcept;
+
+template <typename Derived>
 bool
-traits_interface<BACKEND>::is_bool () const noexcept
+traits_interface<Derived>::is_bool () const noexcept
 {
-    return CINATIVE(*this) ? json_is_boolean(CINATIVE(*this)) : false;
+    auto self = static_cast<Derived const*>(this);
+    return CINATIVE(*self) ? json_is_boolean(CINATIVE(*self)) : false;
 }
 
-template <>
+template bool traits_interface<JSON>::is_bool() const noexcept;
+template bool traits_interface<JSON_REF>::is_bool() const noexcept;
+
+template <typename Derived>
 bool
-traits_interface<BACKEND>::is_integer () const noexcept
+traits_interface<Derived>::is_integer () const noexcept
 {
-    return CINATIVE(*this) ? json_is_integer(CINATIVE(*this)) : false;
+    auto self = static_cast<Derived const *>(this);
+    return CINATIVE(*self) ? json_is_integer(CINATIVE(*self)) : false;
 }
 
-template <>
+template bool traits_interface<JSON>::is_integer() const noexcept;
+template bool traits_interface<JSON_REF>::is_integer() const noexcept;
+
+template <typename Derived>
 bool
-traits_interface<BACKEND>::is_real () const noexcept
+traits_interface<Derived>::is_real () const noexcept
 {
-    return CINATIVE(*this) ? json_is_real(CINATIVE(*this)) : false;
+    auto self = static_cast<Derived const *>(this);
+    return CINATIVE(*self) ? json_is_real(CINATIVE(*self)) : false;
 }
 
-template <>
+template bool traits_interface<JSON>::is_real() const noexcept;
+template bool traits_interface<JSON_REF>::is_real() const noexcept;
+
+template <typename Derived>
 bool
-traits_interface<BACKEND>::is_string () const noexcept
+traits_interface<Derived>::is_string () const noexcept
 {
-    return CINATIVE(*this) ? json_is_string(CINATIVE(*this)) : false;
+    auto self = static_cast<Derived const *>(this);
+    return CINATIVE(*self) ? json_is_string(CINATIVE(*self)) : false;
 }
 
-template <>
+template bool traits_interface<JSON>::is_string() const noexcept;
+template bool traits_interface<JSON_REF>::is_string() const noexcept;
+
+template <typename Derived>
 bool
-traits_interface<BACKEND>::is_array () const noexcept
+traits_interface<Derived>::is_array () const noexcept
 {
-    return CINATIVE(*this) ? json_is_array(CINATIVE(*this)) : false;
+    auto self = static_cast<Derived const *>(this);
+    return CINATIVE(*self) ? json_is_array(CINATIVE(*self)) : false;
 }
 
-template <>
+template bool traits_interface<JSON>::is_array() const noexcept;
+template bool traits_interface<JSON_REF>::is_array() const noexcept;
+
+template <typename Derived>
 bool
-traits_interface<BACKEND>::is_object () const noexcept
+traits_interface<Derived>::is_object () const noexcept
 {
-    return CINATIVE(*this) ? json_is_object(CINATIVE(*this)) : false;
+    auto self = static_cast<Derived const *>(this);
+    return CINATIVE(*self) ? json_is_object(CINATIVE(*self)) : false;
 }
+
+template bool traits_interface<JSON>::is_object() const noexcept;
+template bool traits_interface<JSON_REF>::is_object() const noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Modifiers interface
 ////////////////////////////////////////////////////////////////////////////////
-template <>
+template <typename Derived, typename Backend>
 void
-modifiers_interface<BACKEND>::insert_helper (string_view const & key
+modifiers_interface<Derived, Backend>::insert_helper (string_view const & key
     , std::nullptr_t)
 {
-    if (!INATIVE(*this))
-        INATIVE(*this) = json_object();
+    auto self = static_cast<Derived *>(this);
 
-    backend::insert(INATIVE(*this), key, json_null());
+    if (!INATIVE(*self))
+        INATIVE(*self) = json_object();
+
+    backend::insert(INATIVE(*self), key, json_null());
+}
+template void modifiers_interface<JSON, BACKEND>::insert_helper (string_view const &, std::nullptr_t);
+template void modifiers_interface<JSON_REF, BACKEND>::insert_helper (string_view const &, std::nullptr_t);
+
+template <typename Derived, typename Backend>
+void
+modifiers_interface<Derived, Backend>::insert_helper (string_view const & key, bool b)
+{
+    auto self = static_cast<Derived *>(this);
+
+    if (!INATIVE(*self))
+        INATIVE(*self) = json_object();
+
+    backend::insert(INATIVE(*self), key, json_boolean(b));
 }
 
-template <>
-void
-modifiers_interface<BACKEND>::insert_helper (string_view const & key, bool b)
-{
-    if (!INATIVE(*this))
-        INATIVE(*this) = json_object();
+template void modifiers_interface<JSON, BACKEND>::insert_helper (string_view const &, bool);
+template void modifiers_interface<JSON_REF, BACKEND>::insert_helper (string_view const &, bool);
 
-    backend::insert(INATIVE(*this), key, json_boolean(b));
+template <typename Derived, typename Backend>
+void
+modifiers_interface<Derived, Backend>::insert_helper (string_view const & key, std::intmax_t n)
+{
+    auto self = static_cast<Derived *>(this);
+
+    if (!INATIVE(*self))
+        INATIVE(*self) = json_object();
+
+    backend::insert(INATIVE(*self), key, json_integer(n));
 }
 
-template <>
-void
-modifiers_interface<BACKEND>::insert_helper (string_view const & key, std::intmax_t n)
-{
-    if (!INATIVE(*this))
-        INATIVE(*this) = json_object();
+template void modifiers_interface<JSON, BACKEND>::insert_helper (string_view const &, std::intmax_t);
+template void modifiers_interface<JSON_REF, BACKEND>::insert_helper (string_view const &, std::intmax_t);
 
-    backend::insert(INATIVE(*this), key, json_integer(n));
+template <typename Derived, typename Backend>
+void
+modifiers_interface<Derived, Backend>::insert_helper (string_view const & key, double n)
+{
+    auto self = static_cast<Derived *>(this);
+
+    if (!INATIVE(*self))
+        INATIVE(*self) = json_object();
+
+    backend::insert(INATIVE(*self), key, json_real(n));
 }
 
-template <>
-void
-modifiers_interface<BACKEND>::insert_helper (string_view const & key, double n)
-{
-    if (!INATIVE(*this))
-        INATIVE(*this) = json_object();
+template void modifiers_interface<JSON, BACKEND>::insert_helper (string_view const &, double);
+template void modifiers_interface<JSON_REF, BACKEND>::insert_helper (string_view const &, double);
 
-    backend::insert(INATIVE(*this), key, json_real(n));
+template <typename Derived, typename Backend>
+void
+modifiers_interface<Derived, Backend>::insert_helper (string_view const & key, string_view const & s)
+{
+    auto self = static_cast<Derived *>(this);
+
+    if (!INATIVE(*self))
+        INATIVE(*self) = json_object();
+
+    backend::insert(INATIVE(*self), key, json_stringn_nocheck(s.data(), s.size()));
 }
 
-template <>
-void
-modifiers_interface<BACKEND>::insert_helper (string_view const & key, string_view const & s)
-{
-    if (!INATIVE(*this))
-        INATIVE(*this) = json_object();
+template void modifiers_interface<JSON, BACKEND>::insert_helper (string_view const &, string_view const &);
+template void modifiers_interface<JSON_REF, BACKEND>::insert_helper (string_view const &, string_view const &);
 
-    backend::insert(INATIVE(*this), key, json_stringn_nocheck(s.data(), s.size()));
-}
-
-template <>
+template <typename Derived, typename Backend>
 void
-modifiers_interface<BACKEND>::insert_helper (string_view const & key
-    , json<BACKEND> const & value)
+modifiers_interface<Derived, Backend>::insert_helper (string_view const & key
+    , value_type const & value)
 {
+    auto self = static_cast<Derived *>(this);
+
     if (!value) {
         error err {errc::invalid_argument, "attempt to insert unitialized value"};
         JEYSON__THROW(err);
     }
 
-    if (!INATIVE(*this))
-        INATIVE(*this) = json_object();
+    if (!INATIVE(*self))
+        INATIVE(*self) = json_object();
 
-    if (!json_is_object(INATIVE(*this))) {
+    if (!json_is_object(INATIVE(*self))) {
         error err{errc::incopatible_type, "object expected"};
         JEYSON__THROW(err);
     }
@@ -827,7 +916,7 @@ modifiers_interface<BACKEND>::insert_helper (string_view const & key
         JEYSON__THROW(err);
     }
 
-    auto rc = json_object_setn_new_nocheck(INATIVE(*this)
+    auto rc = json_object_setn_new_nocheck(INATIVE(*self)
         , key.data()
         , key.size()
         , copy);
@@ -838,24 +927,29 @@ modifiers_interface<BACKEND>::insert_helper (string_view const & key
     }
 }
 
-template <>
+template void modifiers_interface<JSON, BACKEND>::insert_helper (string_view const &, value_type const &);
+template void modifiers_interface<JSON_REF, BACKEND>::insert_helper (string_view const &, value_type const &);
+
+template <typename Derived, typename Backend>
 void
-modifiers_interface<BACKEND>::insert (key_type const & key, json<BACKEND> && value)
+modifiers_interface<Derived, Backend>::insert (key_type const & key, value_type && value)
 {
+    auto self = static_cast<Derived *>(this);
+
     if (!value) {
         error err {errc::invalid_argument, "attempt to insert unitialized value"};
         JEYSON__THROW(err);
     }
 
-    if (!INATIVE(*this))
-        INATIVE(*this) = json_object();
+    if (!INATIVE(*self))
+        INATIVE(*self) = json_object();
 
-    if (!json_is_object(INATIVE(*this))) {
+    if (!json_is_object(INATIVE(*self))) {
         error err{errc::incopatible_type, "object expected"};
         JEYSON__THROW(err);
     }
 
-    auto rc = json_object_setn_new_nocheck(INATIVE(*this)
+    auto rc = json_object_setn_new_nocheck(INATIVE(*self)
         , key.c_str()
         , key.size()
         , NATIVE(value));
@@ -868,69 +962,99 @@ modifiers_interface<BACKEND>::insert (key_type const & key, json<BACKEND> && val
     NATIVE(value) = nullptr;
 }
 
-template <>
-void
-modifiers_interface<BACKEND>::push_back_helper (std::nullptr_t)
-{
-    if (!INATIVE(*this))
-        INATIVE(*this) = json_array();
+template void modifiers_interface<JSON, BACKEND>::insert (key_type const &, value_type &&);
+template void modifiers_interface<JSON_REF, BACKEND>::insert (key_type const &, value_type &&);
 
-    backend::push_back(INATIVE(*this), json_null());
+template <typename Derived, typename Backend>
+void
+modifiers_interface<Derived, Backend>::push_back_helper (std::nullptr_t)
+{
+    auto self = static_cast<Derived *>(this);
+
+    if (!INATIVE(*self))
+        INATIVE(*self) = json_array();
+
+    backend::push_back(INATIVE(*self), json_null());
 }
 
-template <>
-void
-modifiers_interface<BACKEND>::push_back_helper (bool b)
-{
-    if (!INATIVE(*this))
-        INATIVE(*this) = json_object();
+template void modifiers_interface<JSON, BACKEND>::push_back_helper (std::nullptr_t);
+template void modifiers_interface<JSON_REF, BACKEND>::push_back_helper (std::nullptr_t);
 
-    backend::push_back(INATIVE(*this), json_boolean(b));
+template <typename Derived, typename Backend>
+void
+modifiers_interface<Derived, Backend>::push_back_helper (bool b)
+{
+    auto self = static_cast<Derived *>(this);
+
+    if (!INATIVE(*self))
+        INATIVE(*self) = json_object();
+
+    backend::push_back(INATIVE(*self), json_boolean(b));
 }
 
-template <>
-void
-modifiers_interface<BACKEND>::push_back_helper (std::intmax_t n)
-{
-    if (!INATIVE(*this))
-        INATIVE(*this) = json_object();
+template void modifiers_interface<JSON, BACKEND>::push_back_helper (bool);
+template void modifiers_interface<JSON_REF, BACKEND>::push_back_helper (bool);
 
-    backend::push_back(INATIVE(*this), json_integer(n));
+template <typename Derived, typename Backend>
+void
+modifiers_interface<Derived, Backend>::push_back_helper (std::intmax_t n)
+{
+    auto self = static_cast<Derived *>(this);
+
+    if (!INATIVE(*self))
+        INATIVE(*self) = json_object();
+
+    backend::push_back(INATIVE(*self), json_integer(n));
 }
 
-template <>
-void
-modifiers_interface<BACKEND>::push_back_helper (double n)
-{
-    if (!INATIVE(*this))
-        INATIVE(*this) = json_object();
+template void modifiers_interface<JSON, BACKEND>::push_back_helper (std::intmax_t);
+template void modifiers_interface<JSON_REF, BACKEND>::push_back_helper (std::intmax_t);
 
-    backend::push_back(INATIVE(*this), json_real(n));
+template <typename Derived, typename Backend>
+void
+modifiers_interface<Derived, Backend>::push_back_helper (double n)
+{
+    auto self = static_cast<Derived *>(this);
+
+    if (!INATIVE(*self))
+        INATIVE(*self) = json_object();
+
+    backend::push_back(INATIVE(*self), json_real(n));
 }
 
-template <>
-void
-modifiers_interface<BACKEND>::push_back_helper (string_view const & s)
-{
-    if (!INATIVE(*this))
-        INATIVE(*this) = json_object();
+template void modifiers_interface<JSON, BACKEND>::push_back_helper (double);
+template void modifiers_interface<JSON_REF, BACKEND>::push_back_helper (double);
 
-    backend::push_back(INATIVE(*this), json_stringn_nocheck(s.data(), s.size()));
+template <typename Derived, typename Backend>
+void
+modifiers_interface<Derived, Backend>::push_back_helper (string_view const & s)
+{
+    auto self = static_cast<Derived *>(this);
+
+    if (!INATIVE(*self))
+        INATIVE(*self) = json_object();
+
+    backend::push_back(INATIVE(*self), json_stringn_nocheck(s.data(), s.size()));
 }
 
-template <>
+template void modifiers_interface<JSON, BACKEND>::push_back_helper (string_view const &);
+template void modifiers_interface<JSON_REF, BACKEND>::push_back_helper (string_view const &);
+
+template <typename Derived, typename Backend>
 void
-modifiers_interface<BACKEND>::push_back_helper (json<BACKEND> const & value)
+modifiers_interface<Derived, Backend>::push_back_helper (value_type const & value)
 {
+    auto self = static_cast<Derived *>(this);
+
     if (!value) {
         error err {errc::invalid_argument, "Attempt to add unitialized value"};
         JEYSON__THROW(err);
     }
 
-    if (! INATIVE(*this))
-        INATIVE(*this) = json_array();
+    if (! INATIVE(*self))
+        INATIVE(*self) = json_array();
 
-    if (!json_is_array(INATIVE(*this))) {
+    if (!json_is_array(INATIVE(*self))) {
         error err{errc::incopatible_type, "Array expected"};
         JEYSON__THROW(err);
     }
@@ -942,7 +1066,7 @@ modifiers_interface<BACKEND>::push_back_helper (json<BACKEND> const & value)
         JEYSON__THROW(err);
     }
 
-    auto rc = json_array_append_new(INATIVE(*this), copy);
+    auto rc = json_array_append_new(INATIVE(*self), copy);
 
     if (rc != 0) {
         error err{errc::backend_error, "Array append failure"};
@@ -950,24 +1074,29 @@ modifiers_interface<BACKEND>::push_back_helper (json<BACKEND> const & value)
     }
 }
 
-template <>
+template void modifiers_interface<JSON, BACKEND>::push_back_helper (value_type const &);
+template void modifiers_interface<JSON_REF, BACKEND>::push_back_helper (value_type const &);
+
+template <typename Derived, typename Backend>
 void
-modifiers_interface<BACKEND>::push_back (json<BACKEND> && value)
+modifiers_interface<Derived, Backend>::push_back (value_type && value)
 {
+    auto self = static_cast<Derived *>(this);
+
     if (!value) {
         error err {errc::invalid_argument, "Attempt to add unitialized value"};
         JEYSON__THROW(err);
     }
 
-    if (! INATIVE(*this))
-        INATIVE(*this) = json_array();
+    if (! INATIVE(*self))
+        INATIVE(*self) = json_array();
 
-    if (!json_is_array(INATIVE(*this))) {
+    if (!json_is_array(INATIVE(*self))) {
         error err{errc::incopatible_type, "Array expected"};
         JEYSON__THROW(err);
     }
 
-    auto rc = json_array_append_new(INATIVE(*this), NATIVE(value));
+    auto rc = json_array_append_new(INATIVE(*self), NATIVE(value));
 
     if (rc != 0) {
         error err{errc::backend_error, "Array append failure"};
@@ -977,25 +1106,33 @@ modifiers_interface<BACKEND>::push_back (json<BACKEND> && value)
     NATIVE(value) = nullptr;
 }
 
+template void modifiers_interface<JSON, BACKEND>::push_back (value_type &&);
+template void modifiers_interface<JSON_REF, BACKEND>::push_back (value_type &&);
+
 ////////////////////////////////////////////////////////////////////////////////
 // Capacity interface
 ////////////////////////////////////////////////////////////////////////////////
-template <>
-capacity_interface<BACKEND>::size_type
-capacity_interface<BACKEND>::size () const noexcept
+template <typename Derived, typename Backend>
+typename capacity_interface<Derived, Backend>::size_type
+capacity_interface<Derived, Backend>::size () const noexcept
 {
-    if (!CINATIVE(*this))
+    auto self = static_cast<Derived const *>(this);
+
+    if (!CINATIVE(*self))
         return 0;
 
-    if (json_is_object(CINATIVE(*this)))
-        return json_object_size(CINATIVE(*this));
+    if (json_is_object(CINATIVE(*self)))
+        return json_object_size(CINATIVE(*self));
 
-    if (json_is_array(CINATIVE(*this)))
-        return json_array_size(CINATIVE(*this));
+    if (json_is_array(CINATIVE(*self)))
+        return json_array_size(CINATIVE(*self));
 
     // Scalar types
     return 1;
 }
+
+template capacity_interface<JSON, BACKEND>::size_type capacity_interface<JSON, BACKEND>::size () const noexcept;
+template capacity_interface<JSON_REF, BACKEND>::size_type capacity_interface<JSON_REF, BACKEND>::size () const noexcept;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Converter interface
@@ -1007,14 +1144,16 @@ static int json_dump_callback (char const * buffer, size_t size, void * data)
     return 0;
 }
 
-template <>
+template <typename Derived>
 std::string
-converter_interface<BACKEND>::to_string () const
+converter_interface<Derived>::to_string () const
 {
     std::string result;
 
-    if (CINATIVE(*this)) {
-        auto rc = json_dump_callback(CINATIVE(*this)
+    auto self = static_cast<Derived const *>(this);
+
+    if (CINATIVE(*self)) {
+        auto rc = json_dump_callback(CINATIVE(*self)
             , json_dump_callback, & result, JSON_COMPACT | JSON_ENCODE_ANY);
 
         if (rc != 0) {
@@ -1025,6 +1164,9 @@ converter_interface<BACKEND>::to_string () const
 
     return result;
 };
+
+template std::string converter_interface<JSON>::to_string () const;
+template std::string converter_interface<JSON_REF>::to_string () const;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Encoder / Decoder
@@ -1179,8 +1321,8 @@ template <>
 std::intmax_t
 decoder<std::intmax_t>::operator () (double v, bool * success) const noexcept
 {
-    if (v >= static_cast<double>(std::numeric_limits<std::intmax_t>::min())
-            && v <= static_cast<double>(std::numeric_limits<std::intmax_t>::max())) {
+    if (v >= static_cast<double>((std::numeric_limits<std::intmax_t>::min)())
+            && v <= static_cast<double>((std::numeric_limits<std::intmax_t>::max)())) {
         return static_cast<std::intmax_t>(v);
     }
 
@@ -1281,7 +1423,7 @@ template <>
 double
 decoder<double>::operator () (std::size_t size, bool, bool *) const noexcept
 {
-    return static_cast<std::intmax_t>(size);
+    return static_cast<double>(size);
 }
 
 //------------------------------------------------------------------------------
@@ -1337,265 +1479,335 @@ decoder<std::string>::operator () (std::size_t size, bool, bool *) const noexcep
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Mutabl element accessor interface
+// Mutable element accessor interface
 ////////////////////////////////////////////////////////////////////////////////
 template <>
-mutable_element_accessor_interface<BACKEND, true>::reference
-mutable_element_accessor_interface<BACKEND, true>::operator [] (size_type pos) noexcept
+mutable_element_accessor_interface<JSON, BACKEND>::reference
+mutable_element_accessor_interface<JSON, BACKEND>::operator [] (size_type pos) noexcept
 {
-    if (!INATIVE(*this))
-        backend::assign(*reinterpret_cast<BACKEND::ref *>(this), json_array());
+    auto self = static_cast<JSON *>(this);
 
-    if (json_is_null(INATIVE(*this)))
-        backend::assign(*reinterpret_cast<BACKEND::ref *>(this), json_array());
+    if (!INATIVE(*self))
+        backend::assign(*static_cast<BACKEND::rep *>(self), json_array());
 
-    if (!json_is_array(INATIVE(*this)))
+    if (json_is_null(INATIVE(*self)))
+        backend::assign(*static_cast<BACKEND::rep *>(self), json_array());
+
+    if (!json_is_array(INATIVE(*self)))
         return reference{};
 
-    if (pos >= json_array_size(INATIVE(*this))) {
+    if (pos >= json_array_size(INATIVE(*self))) {
         // Fill with null values
-        while (json_array_size(INATIVE(*this)) <= pos) {
-            auto rc = json_array_append_new(INATIVE(*this), json_null());
+        while (json_array_size(INATIVE(*self)) <= pos) {
+            auto rc = json_array_append_new(INATIVE(*self), json_null());
             JEYSON__ASSERT(rc == 0, "json_array_append_new() failure");
         }
     }
 
-    auto ptr = json_array_get(INATIVE(*this), pos);
+    auto ptr = json_array_get(INATIVE(*self), pos);
 
     if (!ptr)
         return reference{};
 
-    return reference{BACKEND::ref{ptr, INATIVE(*this), pos}};
+    return reference{BACKEND::ref{ptr, INATIVE(*self), pos}};
 }
 
 template <>
-mutable_element_accessor_interface<BACKEND, true>::reference
-mutable_element_accessor_interface<BACKEND, true>::operator [] (string_view const & key) noexcept
+mutable_element_accessor_interface<JSON, BACKEND>::reference
+mutable_element_accessor_interface<JSON, BACKEND>::operator [] (string_view key) noexcept
 {
-    if (!INATIVE(*this))
-        backend::assign(*reinterpret_cast<BACKEND::ref *>(this), json_object());
+    auto self = static_cast<JSON *>(this);
 
-    if (json_is_null(INATIVE(*this)))
-        backend::assign(*reinterpret_cast<BACKEND::ref *>(this), json_object());
+    if (!INATIVE(*self))
+        backend::assign(*static_cast<BACKEND::rep *>(self), json_object());
 
-    if (!json_is_object(INATIVE(*this)))
+    if (json_is_null(INATIVE(*self)))
+        backend::assign(*static_cast<BACKEND::rep *>(self), json_object());
+
+    if (!json_is_object(INATIVE(*self)))
         return reference{};
 
     // Return borrowed reference.
-    auto ptr = json_object_getn(INATIVE(*this), key.data(), key.length());
+    auto ptr = json_object_getn(INATIVE(*self), key.data(), key.length());
 
     // Not found, insert new `null` element
     if (!ptr) {
-        auto rc = json_object_setn_new_nocheck(INATIVE(*this)
+        auto rc = json_object_setn_new_nocheck(INATIVE(*self)
             , key.data(), key.length(), json_null());
 
         if (rc != 0)
             return reference{};
 
         // Return borrowed reference.
-        ptr = json_object_getn(INATIVE(*this), key.data(), key.length());
+        ptr = json_object_getn(INATIVE(*self), key.data(), key.length());
 
         JEYSON__ASSERT(ptr, "");
     }
 
-    return reference{BACKEND::ref{ptr, INATIVE(*this), key_type(key.data(), key.length())}};
+    return reference{BACKEND::ref{ptr, INATIVE(*self), key_type(key.data(), key.length())}};
 }
 
 template <>
-mutable_element_accessor_interface<BACKEND, false>::reference
-mutable_element_accessor_interface<BACKEND, false>::operator [] (size_type pos) noexcept
+mutable_element_accessor_interface<JSON_REF, BACKEND>::reference
+mutable_element_accessor_interface<JSON_REF, BACKEND>::operator [] (size_type pos) noexcept
 {
-    if (!INATIVE(*this))
-        backend::assign(*reinterpret_cast<BACKEND::rep *>(this), json_array());
+    auto self = static_cast<JSON_REF *>(this);
 
-    if (json_is_null(INATIVE(*this)))
-        backend::assign(*reinterpret_cast<BACKEND::rep *>(this), json_array());
+    if (!INATIVE(*self))
+        backend::assign(*static_cast<BACKEND::ref *>(self), json_array());
 
-    if (!json_is_array(INATIVE(*this)))
+    if (json_is_null(INATIVE(*self)))
+        backend::assign(*static_cast<BACKEND::ref *>(self), json_array());
+
+    if (!json_is_array(INATIVE(*self)))
         return reference{};
 
-    if (pos >= json_array_size(INATIVE(*this))) {
+    if (pos >= json_array_size(INATIVE(*self))) {
         // Fill with null values
-        while (json_array_size(INATIVE(*this)) <= pos) {
-            auto rc = json_array_append_new(INATIVE(*this), json_null());
+        while (json_array_size(INATIVE(*self)) <= pos) {
+            auto rc = json_array_append_new(INATIVE(*self), json_null());
             JEYSON__ASSERT(rc == 0, "json_array_append_new() failure");
         }
     }
 
-    auto ptr = json_array_get(INATIVE(*this), pos);
+    auto ptr = json_array_get(INATIVE(*self), pos);
 
     if (!ptr)
         return reference{};
 
-    return reference{BACKEND::ref{ptr, INATIVE(*this), pos}};
+    return reference{BACKEND::ref{ptr, INATIVE(*self), pos}};
 }
 
 template <>
-mutable_element_accessor_interface<BACKEND, false>::reference
-mutable_element_accessor_interface<BACKEND, false>::operator [] (string_view const & key) noexcept
+mutable_element_accessor_interface<JSON_REF, BACKEND>::reference
+mutable_element_accessor_interface<JSON_REF, BACKEND>::operator [] (string_view key) noexcept
 {
-    if (!INATIVE(*this))
-        backend::assign(*reinterpret_cast<BACKEND::rep *>(this), json_object());
+    auto self = static_cast<JSON_REF *>(this);
 
-    if (json_is_null(INATIVE(*this)))
-        backend::assign(*reinterpret_cast<BACKEND::rep *>(this), json_object());
+    if (!INATIVE(*self))
+        backend::assign(*static_cast<BACKEND::ref *>(self), json_object());
 
-    if (!json_is_object(INATIVE(*this)))
+    if (json_is_null(INATIVE(*self)))
+        backend::assign(*static_cast<BACKEND::ref *>(self), json_object());
+
+    if (!json_is_object(INATIVE(*self)))
         return reference{};
 
     // Return borrowed reference.
-    auto ptr = json_object_getn(INATIVE(*this), key.data(), key.length());
+    auto ptr = json_object_getn(INATIVE(*self), key.data(), key.length());
 
     // Not found, insert new `null` element
     if (!ptr) {
-        auto rc = json_object_setn_new_nocheck(INATIVE(*this)
+        auto rc = json_object_setn_new_nocheck(INATIVE(*self)
             , key.data(), key.length(), json_null());
 
         if (rc != 0)
             return reference{};
 
         // Return borrowed reference.
-        ptr = json_object_getn(INATIVE(*this), key.data(), key.length());
+        ptr = json_object_getn(INATIVE(*self), key.data(), key.length());
 
         JEYSON__ASSERT(ptr, "");
     }
 
-    return reference{BACKEND::ref{ptr, INATIVE(*this), key_type(key.data(), key.length())}};
+    return reference{BACKEND::ref{ptr, INATIVE(*self), key_type(key.data(), key.length())}};
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Element accessor interface
 ////////////////////////////////////////////////////////////////////////////////
-template <>
-element_accessor_interface<BACKEND>::const_reference
-element_accessor_interface<BACKEND>::operator [] (size_type pos) const noexcept
-{
-    if (!CINATIVE(*this) || !json_is_array(CINATIVE(*this)))
-        return reference{};
 
-    auto ptr = json_array_get(CINATIVE(*this), pos);
+template <typename Derived, typename Backend>
+// Specify an explicit return type to avoid:
+// error C2244: 'jeyson::element_accessor_interface<Derived,Backend>::operator []': 
+// unable to match function definition to an existing declaration
+//typename element_accessor_interface<Derived, Backend>::const_reference
+json_ref<Backend> const
+element_accessor_interface<Derived, Backend>::operator [] (size_type pos) const noexcept
+{
+    auto self = static_cast<Derived const *>(this);
+
+    if (!CINATIVE(*self) || !json_is_array(CINATIVE(*self)))
+        return const_reference{};
+
+    auto ptr = json_array_get(CINATIVE(*self), pos);
 
     if (!ptr)
-        return reference{};
+        return const_reference{};
 
-    return reference{BACKEND::ref{ptr, CINATIVE(*this), pos}};
+    return const_reference{BACKEND::ref{ptr, CINATIVE(*self), pos}};
 }
 
-template <>
-element_accessor_interface<BACKEND>::const_reference
-element_accessor_interface<BACKEND>::operator [] (string_view const & key) const noexcept
+template element_accessor_interface<JSON, BACKEND>::const_reference element_accessor_interface<JSON, BACKEND>::operator [] (size_type pos) const noexcept;
+template element_accessor_interface<JSON_REF, BACKEND>::const_reference element_accessor_interface<JSON_REF, BACKEND>::operator [] (size_type pos) const noexcept;
+
+template <typename Derived, typename Backend>
+//typename element_accessor_interface<Derived, Backend>::const_reference
+json_ref<Backend> const
+element_accessor_interface<Derived, Backend>::operator [] (string_view key) const noexcept
 {
-    if (!CINATIVE(*this) || !json_is_object(CINATIVE(*this)))
+    auto self = static_cast<Derived const *>(this);
+
+    if (!CINATIVE(*self) || !json_is_object(CINATIVE(*self)))
         return reference{};
 
-    auto ptr = json_object_getn(CINATIVE(*this), key.data(), key.length());
+    auto ptr = json_object_getn(CINATIVE(*self), key.data(), key.length());
 
     // Not found
     if (!ptr)
         return reference{};
 
-    return reference{BACKEND::ref{ptr, CINATIVE(*this), key_type(key.data(), key.length())}};
+    return reference{BACKEND::ref{ptr, CINATIVE(*self), key_type(key.data(), key.length())}};
 }
 
-template <>
-element_accessor_interface<BACKEND>::reference
-element_accessor_interface<BACKEND>::at (size_type pos) const
+template element_accessor_interface<JSON, BACKEND>::const_reference element_accessor_interface<JSON, BACKEND>::operator [] (string_view key) const noexcept;
+template element_accessor_interface<JSON_REF, BACKEND>::const_reference element_accessor_interface<JSON_REF, BACKEND>::operator [] (string_view key) const noexcept;
+
+template <typename Derived, typename Backend>
+typename element_accessor_interface<Derived, Backend>::reference
+element_accessor_interface<Derived, Backend>::at (size_type pos) const
 {
-    if (!CINATIVE(*this) || !json_is_array(CINATIVE(*this))) {
+    auto self = static_cast<Derived const *>(this);
+
+    if (!CINATIVE(*self) || !json_is_array(CINATIVE(*self))) {
         error err{errc::incopatible_type, "array expected"};
         JEYSON__THROW(err);
     }
 
-    auto ptr = json_array_get(CINATIVE(*this), pos);
+    auto ptr = json_array_get(CINATIVE(*self), pos);
 
     if (!ptr) {
         error err{errc::out_of_range};
         JEYSON__THROW(err);
     }
 
-    return reference{BACKEND::ref{ptr, CINATIVE(*this), pos}};
+    return reference{BACKEND::ref{ptr, CINATIVE(*self), pos}};
 }
 
-template <>
-element_accessor_interface<BACKEND>::reference
-element_accessor_interface<BACKEND>::at (string_view const & key) const
+template element_accessor_interface<JSON, BACKEND>::reference element_accessor_interface<JSON, BACKEND>::at (size_type pos) const;
+template element_accessor_interface<JSON_REF, BACKEND>::reference element_accessor_interface<JSON_REF, BACKEND>::at (size_type pos) const;
+
+template <typename Derived, typename Backend>
+typename element_accessor_interface<Derived, Backend>::reference
+element_accessor_interface<Derived, Backend>::at (string_view key) const
 {
-    if (!CINATIVE(*this) || !json_is_object(CINATIVE(*this))) {
+    auto self = static_cast<Derived const *>(this);
+
+    if (!CINATIVE(*self) || !json_is_object(CINATIVE(*self))) {
         error err{errc::incopatible_type, "object expected"};
         JEYSON__THROW(err);
     }
 
-    auto ptr = json_object_getn(CINATIVE(*this), key.data(), key.length());
+    auto ptr = json_object_getn(CINATIVE(*self), key.data(), key.length());
 
     if (!ptr) {
         error err{errc::out_of_range};
         JEYSON__THROW(err);
     }
 
-    return reference{BACKEND::ref{ptr, CINATIVE(*this), key_type(key.data(), key.length())}};
+    return reference{BACKEND::ref{ptr, CINATIVE(*self)
+        , key_type(key.data(), key.length())}};
 }
 
-template <>
+template element_accessor_interface<JSON, BACKEND>::reference element_accessor_interface<JSON, BACKEND>::at (string_view key) const;
+template element_accessor_interface<JSON_REF, BACKEND>::reference element_accessor_interface<JSON_REF, BACKEND>::at (string_view key) const;
+
+template <typename Derived, typename Backend>
 bool
-element_accessor_interface<BACKEND>::contains (string_view const & key) const
+element_accessor_interface<Derived, Backend>::contains (string_view key) const
 {
-    if (!CINATIVE(*this) || !json_is_object(CINATIVE(*this)))
+    auto self = static_cast<Derived const *>(this);
+
+    if (!CINATIVE(*self) || !json_is_object(CINATIVE(*self)))
         return false;
 
-    auto ptr = json_object_getn(CINATIVE(*this), key.data(), key.length());
+    auto ptr = json_object_getn(CINATIVE(*self), key.data(), key.length());
     return !!ptr;
 }
+
+template bool element_accessor_interface<JSON, BACKEND>::contains (string_view key) const;
+template bool element_accessor_interface<JSON_REF, BACKEND>::contains (string_view key) const;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Getter interface
 ////////////////////////////////////////////////////////////////////////////////
-template <>
+template <typename Derived, typename Backend>
 bool
-getter_interface<BACKEND>::bool_value () const noexcept
+getter_interface<Derived, Backend>::bool_value () const noexcept
 {
-    JEYSON__ASSERT(json_is_boolean(CINATIVE(*this)), "Boolean value expected");
-    return json_is_true(CINATIVE(*this)) ? true : false;
+    auto self = static_cast<Derived const *>(this);
+
+    JEYSON__ASSERT(json_is_boolean(CINATIVE(*self)), "Boolean value expected");
+    return json_is_true(CINATIVE(*self)) ? true : false;
 }
 
-template <>
+template bool getter_interface<JSON, BACKEND>::bool_value () const noexcept;
+template bool getter_interface<JSON_REF, BACKEND>::bool_value () const noexcept;
+
+template <typename Derived, typename Backend>
 std::intmax_t
-getter_interface<BACKEND>::integer_value () const noexcept
+getter_interface<Derived, Backend>::integer_value () const noexcept
 {
-    JEYSON__ASSERT(json_is_integer(CINATIVE(*this)), "Integer value expected");
-    return static_cast<std::intmax_t>(json_integer_value(CINATIVE(*this)));
+    auto self = static_cast<Derived const *>(this);
+
+    JEYSON__ASSERT(json_is_integer(CINATIVE(*self)), "Integer value expected");
+    return static_cast<std::intmax_t>(json_integer_value(CINATIVE(*self)));
 }
 
-template <>
+template std::intmax_t getter_interface<JSON, BACKEND>::integer_value () const noexcept;
+template std::intmax_t getter_interface<JSON_REF, BACKEND>::integer_value () const noexcept;
+
+template <typename Derived, typename Backend>
 double
-getter_interface<BACKEND>::real_value () const noexcept
+getter_interface<Derived, Backend>::real_value () const noexcept
 {
-    JEYSON__ASSERT(json_is_real(CINATIVE(*this)), "Real value expected");
-    return json_real_value(CINATIVE(*this));
+    auto self = static_cast<Derived const *>(this);
+
+    JEYSON__ASSERT(json_is_real(CINATIVE(*self)), "Real value expected");
+    return json_real_value(CINATIVE(*self));
 }
 
-template <>
+template double getter_interface<JSON, BACKEND>::real_value () const noexcept;
+template double getter_interface<JSON_REF, BACKEND>::real_value () const noexcept;
+
+template <typename Derived, typename Backend>
 string_view
-getter_interface<BACKEND>::string_value () const noexcept
+getter_interface<Derived, Backend>::string_value () const noexcept
 {
-    JEYSON__ASSERT(json_is_string(CINATIVE(*this)), "String value expected");
-    return string_view(json_string_value(CINATIVE(*this))
-        , json_string_length(CINATIVE(*this)));
+    auto self = static_cast<Derived const *>(this);
+
+    JEYSON__ASSERT(json_is_string(CINATIVE(*self)), "String value expected");
+    return string_view(json_string_value(CINATIVE(*self))
+        , json_string_length(CINATIVE(*self)));
 }
 
-template <>
+template string_view getter_interface<JSON, BACKEND>::string_value () const noexcept;
+template string_view getter_interface<JSON_REF, BACKEND>::string_value () const noexcept;
+
+template <typename Derived, typename Backend>
 std::size_t
-getter_interface<BACKEND>::array_size () const noexcept
+getter_interface<Derived, Backend>::array_size () const noexcept
 {
-    JEYSON__ASSERT(json_is_array(CINATIVE(*this)), "Array expected");
-    return json_array_size(CINATIVE(*this));
+    auto self = static_cast<Derived const *>(this);
+
+    JEYSON__ASSERT(json_is_array(CINATIVE(*self)), "Array expected");
+    return json_array_size(CINATIVE(*self));
 }
 
-template <>
+template std::size_t getter_interface<JSON, BACKEND>::array_size () const noexcept;
+template std::size_t getter_interface<JSON_REF, BACKEND>::array_size () const noexcept;
+
+template <typename Derived, typename Backend>
 std::size_t
-getter_interface<BACKEND>::object_size () const noexcept
+getter_interface<Derived, Backend>::object_size () const noexcept
 {
-    JEYSON__ASSERT(json_is_object(CINATIVE(*this)), "Object expected");
-    return json_object_size(CINATIVE(*this));
+    auto self = static_cast<Derived const *>(this);
+
+    JEYSON__ASSERT(json_is_object(CINATIVE(*self)), "Object expected");
+    return json_object_size(CINATIVE(*self));
 }
+
+template std::size_t getter_interface<JSON, BACKEND>::object_size () const noexcept;
+template std::size_t getter_interface<JSON_REF, BACKEND>::object_size () const noexcept;
 
 } // namespace jeyson

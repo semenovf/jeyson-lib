@@ -6,43 +6,68 @@
 // Changelog:
 //      2022.02.07 Initial version.
 ////////////////////////////////////////////////////////////////////////////////
+
+// Avoid warning C4996:
+// 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead.
+#if _MSC_VER
+#   define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include "pfs/fmt.hpp"
 #include "pfs/jeyson/json.hpp"
 #include "pfs/jeyson/backend/jansson.hpp"
 #include "pfs/optional.hpp"
+#include <array>
 #include <vector>
 
 template <typename Backend>
 void run_basic_tests ()
 {
     using json = jeyson::json<Backend>;
+    using json_ref = jeyson::json_ref<Backend>;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constructors
 ////////////////////////////////////////////////////////////////////////////////
     {
         json j;
+        json_ref jr {j};
         CHECK_FALSE(j);
+        CHECK_FALSE(jr);
     }
 
     {
         json j {nullptr};
+        json_ref jr {j};
         CHECK(j);
+        CHECK(jr);
+
         CHECK(is_null(j));
+        CHECK(is_null(jr));
     }
 
     {
         json j {true};
+        json_ref jr {j};
+
         CHECK(j);
+        CHECK(jr);
+
         CHECK(is_bool(j));
+        CHECK(is_bool(jr));
     }
 
     {
         json j {false};
+        json_ref jr {j};
+
         CHECK(j);
+        CHECK(jr);
+
         CHECK(is_bool(j));
+        CHECK(is_bool(jr));
     }
 
     {
@@ -88,7 +113,7 @@ void run_basic_tests ()
 
     // Constructors from integral values
     {
-        for (auto const & j: std::array<json, 11>{
+        for (auto const & j: {
               json{char{42}}
             , json{std::int8_t{42}}
             , json{std::uint8_t{42}}
@@ -132,7 +157,7 @@ void run_basic_tests ()
         CHECK(!!j);
         CHECK(is_real(j));
 
-        float f1 = 3.14;
+        float f1 = 3.14f;
         float volatile f2 = f1;
         float const f3 = f2;
         float volatile const f4 = f3;
@@ -577,7 +602,7 @@ void run_decoder_tests ()
 
 void run_encoder_tests ()
 {
-
+    // TODO
 }
 
 template <typename Backend>
@@ -646,7 +671,6 @@ void run_access_tests ()
         CHECK(is_string(j["string"]));
     }
 }
-
 
 template <typename Backend, typename Int>
 void check_integral_assigment ()
@@ -737,7 +761,6 @@ void check_floating_point_assigment ()
         CHECK_EQ(jeyson::get<Float>(j), Float{42});
     }
 }
-
 
 template <typename Backend>
 void run_assignment_tests ()

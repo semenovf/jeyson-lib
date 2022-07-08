@@ -7,7 +7,7 @@
 #      2019.12.11 Initial version.
 #      2022.02.07 Refactored for using portable_target `ADD_TEST`.
 ################################################################################
-project(jeyson-lib-TESTS)
+project(jeyson-TESTS)
 
 # Copy test files to build folder
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION .)

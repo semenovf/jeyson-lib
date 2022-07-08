@@ -5,9 +5,11 @@
 //
 // Changelog:
 //      2022.02.07 Initial version.
+//      2022.07.08 Fixed for MSVC.
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "pfs/jeyson/error.hpp"
+#include "pfs/jeyson/exports.hpp"
 #include "pfs/filesystem.hpp"
 #include "pfs/optional.hpp"
 #include "pfs/string_view.hpp"
@@ -58,28 +60,28 @@ struct decoder<T, typename
 {
     T operator () () const noexcept
     {
-        return decoder<std::intmax_t>{}.operator() ();
+        return static_cast<T>(decoder<std::intmax_t>{}.operator() ());
     }
 
     T operator () (std::nullptr_t, bool * success) const noexcept
     {
-        return decoder<std::intmax_t>{}.operator() (nullptr, success);
+        return static_cast<T>(decoder<std::intmax_t>{}.operator() (nullptr, success));
     }
 
     T operator () (bool v, bool * success) const noexcept
     {
-        return decoder<std::intmax_t>{}.operator() (v, success);
+        return static_cast<T>(decoder<std::intmax_t>{}.operator() (v, success));
     }
 
     T operator () (std::intmax_t v, bool * success) const noexcept
     {
         // Overflow or underflow
-        if (v < std::numeric_limits<T>::min() || v > std::numeric_limits<T>::max()) {
+        if (v < (std::numeric_limits<T>::min)() || v > (std::numeric_limits<T>::max)()) {
             *success = false;
             return this->operator() ();
         }
 
-        return decoder<std::intmax_t>{}.operator() (v, success);
+        return static_cast<T>(decoder<std::intmax_t>{}.operator() (v, success));
     }
 
     T operator () (double v, bool * success) const noexcept
@@ -117,28 +119,28 @@ struct decoder<T, typename
 {
     T operator () () const noexcept
     {
-        return decoder<std::intmax_t>{}.operator() ();
+        return static_cast<T>(decoder<std::intmax_t>{}.operator() ());
     }
 
     T operator () (std::nullptr_t, bool * success) const noexcept
     {
-        return decoder<std::intmax_t>{}.operator() (nullptr, success);
+        return static_cast<T>(decoder<std::intmax_t>{}.operator() (nullptr, success));
     }
 
     T operator () (bool v, bool * success) const noexcept
     {
-        return decoder<std::intmax_t>{}.operator() (v, success);
+        return static_cast<T>(decoder<std::intmax_t>{}.operator() (v, success));
     }
 
     T operator () (std::intmax_t v, bool * success) const noexcept
     {
         // Overflow
-        if (static_cast<std::uintmax_t>(v) > std::numeric_limits<T>::max()) {
+        if (static_cast<std::uintmax_t>(v) > (std::numeric_limits<T>::max)()) {
             *success = false;
             return this->operator() ();
         }
 
-        return decoder<std::intmax_t>{}.operator() (v, success);
+        return static_cast<T>(decoder<std::intmax_t>{}.operator() (v, success));
     }
 
     T operator () (double v, bool * success) const noexcept
@@ -174,32 +176,32 @@ struct decoder<T, typename
 {
     T operator () () const noexcept
     {
-        return decoder<double>{}.operator() ();
+        return static_cast<T>(decoder<double>{}.operator() ());
     }
 
     T operator () (std::nullptr_t, bool * success) const noexcept
     {
-        return decoder<double>{}.operator() (nullptr, success);
+        return static_cast<T>(decoder<double>{}.operator() (nullptr, success));
     }
 
     T operator () (bool v, bool * success) const noexcept
     {
-        return decoder<double>{}.operator() (v, success);
+        return static_cast<T>(decoder<double>{}.operator() (v, success));
     }
 
     T operator () (std::intmax_t v, bool * success) const noexcept
     {
-        return decoder<double>{}.operator() (v, success);
+        return static_cast<T>(decoder<double>{}.operator() (v, success));
     }
 
     T operator () (double v, bool * success) const noexcept
     {
-        if (v < std::numeric_limits<T>::min() || v > std::numeric_limits<T>::max()) {
+        if (v < (std::numeric_limits<T>::min)() || v > (std::numeric_limits<T>::max)()) {
             *success = false;
             return this->operator() ();
         }
 
-        return decoder<double>{}.operator() (v, success);
+        return static_cast<T>(decoder<double>{}.operator() (v, success));
     }
 
     T operator () (string_view const & v, bool * success) const noexcept
@@ -303,7 +305,7 @@ struct encoder<json<T>>
 ////////////////////////////////////////////////////////////////////////////////
 // Traits interface
 ////////////////////////////////////////////////////////////////////////////////
-template <typename Backend>
+template <typename Derived>
 class traits_interface
 {
 public:
@@ -349,12 +351,13 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 // Modifiers interface
 ////////////////////////////////////////////////////////////////////////////////
-template <typename Backend>
+template <typename Derived, typename Backend>
 class modifiers_interface
 {
 public:
-    using size_type = typename Backend::size_type;
-    using key_type = typename Backend::key_type;
+    using value_type = json<Backend>;
+    using size_type  = typename Backend::size_type;
+    using key_type   = typename Backend::key_type;
 
 private:
     void insert_helper (string_view const & key, std::nullptr_t);
@@ -373,7 +376,7 @@ private:
         insert_helper(key, string_view{s});
     }
 
-    void insert_helper (string_view const & key, json<Backend> const & j);
+    void insert_helper (string_view const & key, value_type const & j);
 
     void push_back_helper (std::nullptr_t);
     void push_back_helper (bool);
@@ -391,7 +394,7 @@ private:
         push_back_helper(string_view{s});
     }
 
-    void push_back_helper (json<Backend> const & j);
+    void push_back_helper (value_type const & j);
 
 public:
     /**
@@ -447,7 +450,7 @@ public:
      * Inserts @a value into the object overriding if the object already contains
      * an element with an equivalent key.
      */
-    void insert (key_type const & key, json<Backend> && value);
+    void insert (key_type const & key, value_type && value);
 
     /**
      * Appends the given element @a value to the end of the array.
@@ -480,13 +483,13 @@ public:
      *         and it is not an error.
      * @throw @c error { @c errc::backend_error } if backend call(s) results a failure.
      */
-    void push_back (json<Backend> && value);
+    void push_back (value_type && value);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 // Capacity interface
 ////////////////////////////////////////////////////////////////////////////////
-template <typename Backend>
+template <typename Derived, typename Backend>
 class capacity_interface
 {
 public:
@@ -512,7 +515,7 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 // Converter interface
 ////////////////////////////////////////////////////////////////////////////////
-template <typename Backend>
+template <typename Derived>
 class converter_interface
 {
 public:
@@ -525,12 +528,12 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 // Mutable element access interface
 ////////////////////////////////////////////////////////////////////////////////
-template <typename Backend, bool IsRef>
+template <typename Derived, typename Backend>
 class mutable_element_accessor_interface
 {
 public:
     using size_type = typename Backend::size_type;
-    using key_type = typename Backend::key_type;
+    using key_type  = typename Backend::key_type;
     using reference = json_ref<Backend>;
 
 public:
@@ -562,7 +565,7 @@ public:
      * Returns a reference to the value that is mapped to a key equivalent
      * to @a key, performing an insertion if such key does not already exist.
      */
-    reference operator [] (string_view const & key) noexcept;
+    reference operator [] (string_view) noexcept;
 
     reference operator [] (key_type const & key) noexcept
     {
@@ -578,7 +581,7 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 // Element access interface
 ////////////////////////////////////////////////////////////////////////////////
-template <typename Backend>
+template <typename Derived, typename Backend>
 class element_accessor_interface
 {
 public:
@@ -616,7 +619,7 @@ public:
      * to @a key. In case of out of range, the result is a reference to an
      * invalid value.
      */
-    const_reference operator [] (string_view const & key) const noexcept;
+    const_reference operator [] (string_view key) const noexcept;
 
     const_reference operator [] (key_type const & key) const noexcept
     {
@@ -658,7 +661,7 @@ public:
      *        or it is not an object.
      * @throw @c error { @c errc::out_of_range } if an element by @a key not found.
      */
-    reference at (string_view const & key) const;
+    reference at (string_view key) const;
 
     reference at (key_type const & key) const
     {
@@ -676,7 +679,7 @@ public:
      * @note This method is applicable only for objects, in other cases it
      *       returns @c false.
      */
-    bool contains (string_view const & key) const;
+    bool contains (string_view key) const;
 
     bool contains (key_type const & key) const
     {
@@ -692,7 +695,7 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 // Getter interface
 ////////////////////////////////////////////////////////////////////////////////
-template <typename Backend>
+template <typename Derived, typename Backend>
 class getter_interface
 {
 public:
@@ -720,7 +723,7 @@ public:
     T get (bool & success) const noexcept
     {
         decoder<T> decode;
-        auto self = reinterpret_cast<traits_interface<Backend> const *>(this);
+        auto self = static_cast<Derived const *>(this);
         success = true;
 
         if (self->is_bool()) {
@@ -771,7 +774,7 @@ public:
     template <typename T>
     T get_or (T const & alt) const noexcept
     {
-        auto self = reinterpret_cast<traits_interface<Backend> const *>(this);
+        auto self = static_cast<Derived const *>(this);
 
         if (self->is_null())
             return alt;
@@ -787,24 +790,26 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 template <typename Backend = backend::jansson>
 class json_ref: public Backend::ref
-    , public traits_interface<Backend>
-    , public modifiers_interface<Backend>
-    , public capacity_interface<Backend>
-    , public converter_interface<Backend>
-    , public mutable_element_accessor_interface<Backend, true>
-    , public element_accessor_interface<Backend>
-    , public getter_interface<Backend>
+    , public traits_interface<json_ref<Backend>>
+    , public modifiers_interface<json_ref<Backend>, Backend>
+    , public capacity_interface<json_ref<Backend>, Backend>
+    , public converter_interface<json_ref<Backend>>
+    , public mutable_element_accessor_interface<json_ref<Backend>, Backend>
+    , public element_accessor_interface<json_ref<Backend>, Backend>
+    , public getter_interface<json_ref<Backend>, Backend>
 {
     friend class json<Backend>;
-    friend class mutable_element_accessor_interface<Backend, true>;
-    friend class mutable_element_accessor_interface<Backend, false>;
-    friend class element_accessor_interface<Backend>;
+    friend class mutable_element_accessor_interface<json_ref<Backend>, Backend>;
+    friend class mutable_element_accessor_interface<json<Backend>, Backend>;
+    friend class element_accessor_interface<json_ref<Backend>, Backend>;
+    friend class element_accessor_interface<json<Backend>, Backend>;
 
 public:
-    using rep_type  = typename Backend::ref;
-    using size_type = typename Backend::size_type;
-    using key_type  = typename Backend::key_type;
-    using reference       = json_ref<Backend>;
+    using value_type = typename json<Backend>;
+    using rep_type   = typename Backend::ref;
+    using size_type  = typename Backend::size_type;
+    using key_type   = typename Backend::key_type;
+    using reference  = json_ref<Backend>;
     using const_reference = json_ref<Backend> const;
 
 private:
@@ -827,14 +832,14 @@ private:
     }
 
 public:
-    using mutable_element_accessor_interface<Backend, true>::operator [];
-    using element_accessor_interface<Backend>::operator [];
+    using mutable_element_accessor_interface<json_ref<Backend>, Backend>::operator [];
+    using element_accessor_interface<json_ref<Backend>, Backend>::operator [];
 
 public:
     json_ref (typename Backend::ref &&);
     json_ref (json_ref const &);
     json_ref (json_ref &&);
-    explicit json_ref (json<Backend> const &);
+    explicit json_ref (json<Backend> &);
     explicit json_ref (json<Backend> &&);
     ~json_ref ();
 
@@ -869,13 +874,13 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 template <typename Backend = backend::jansson>
 class json: public Backend::rep
-    , public traits_interface<Backend>
-    , public modifiers_interface<Backend>
-    , public capacity_interface<Backend>
-    , public converter_interface<Backend>
-    , public mutable_element_accessor_interface<Backend, false>
-    , public element_accessor_interface<Backend>
-    , public getter_interface<Backend>
+    , public traits_interface<json<Backend>>
+    , public modifiers_interface<json<Backend>, Backend>
+    , public capacity_interface<json<Backend>, Backend>
+    , public converter_interface<json<Backend>>
+    , public mutable_element_accessor_interface<json<Backend>, Backend>
+    , public element_accessor_interface<json<Backend>, Backend>
+    , public getter_interface<json<Backend>, Backend>
 {
 public:
     using rep_type        = typename Backend::rep;
@@ -906,8 +911,8 @@ private:
     void assign_helper (json<Backend> const & j);
 
 public:
-    using mutable_element_accessor_interface<Backend, false>::operator [];
-    using element_accessor_interface<Backend>::operator [];
+    using mutable_element_accessor_interface<json<Backend>, Backend>::operator [];
+    using element_accessor_interface<json<Backend>, Backend>::operator [];
 
 public:
     /// Check if JSON value is initialized.

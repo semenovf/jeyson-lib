@@ -21,7 +21,7 @@ endif()
 
 add_subdirectory(${JEYSON__JANSSON_ROOT} jansson)
 
-target_include_directories(jansson PUBLIC $<TARGET_FILE_DIR:jansson>/../include)
+#target_include_directories(jansson PUBLIC $<TARGET_FILE_DIR:jansson>/../include)
 
 if (CMAKE_COMPILER_IS_GNUCXX)
     # For link custom shared libraries with Jansson static library
