@@ -7,10 +7,12 @@
 #      2022.02.07 Initial version.
 ################################################################################
 cmake_minimum_required (VERSION 3.11)
-project(jeyson-lib C CXX)
+project(jeyson C CXX)
 
 option(JEYSON__ENABLE_JANSSON "Enable `Jansson` library for JSON support" ON)
 option(JEYSON__EXCEPTIONS_DISABLED "Disable exceptions" OFF)
+
+portable_target(LIBRARY ${PROJECT_NAME} ALIAS pfs::jeyson)
 
 if (NOT TARGET pfs::common)
     portable_target(INCLUDE_PROJECT
@@ -24,9 +26,9 @@ if (JEYSON__ENABLE_JANSSON AND NOT TARGET jansson)
 
     portable_target(INCLUDE_PROJECT
         ${CMAKE_CURRENT_LIST_DIR}/cmake/Jansson.cmake)
-endif()
 
-portable_target(LIBRARY ${PROJECT_NAME} ALIAS pfs::jeyson)
+    portable_target(INCLUDE_DIRS ${PROJECT_NAME} PRIVATE $<TARGET_PROPERTY:jansson,INCLUDE_DIRECTORIES>)
+endif()
 
 portable_target(INCLUDE_DIRS ${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 portable_target(LINK ${PROJECT_NAME} PUBLIC pfs::common)
