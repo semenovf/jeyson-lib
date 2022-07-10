@@ -3,7 +3,7 @@
 CWD=`pwd`
 JANNSON_RELEASE=v2.14
 
-if [ -d .git ] ; then
+if [ -e .git ] ; then
 
     git pull \
         && git submodule update --init \
