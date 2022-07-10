@@ -805,7 +805,7 @@ class json_ref: public Backend::ref
     friend class element_accessor_interface<json<Backend>, Backend>;
 
 public:
-    using value_type = typename json<Backend>;
+    using value_type = json<Backend>;
     using rep_type   = typename Backend::ref;
     using size_type  = typename Backend::size_type;
     using key_type   = typename Backend::key_type;
@@ -884,7 +884,7 @@ class json: public Backend::rep
 {
 public:
     using rep_type        = typename Backend::rep;
-    using value_type      = json;
+    using value_type      = json<Backend>;
     using size_type       = typename Backend::size_type;
     using string_type     = typename Backend::string_type;
     using key_type        = typename Backend::key_type;

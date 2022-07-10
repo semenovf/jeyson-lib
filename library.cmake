@@ -12,20 +12,24 @@ project(jeyson C CXX)
 option(JEYSON__ENABLE_JANSSON "Enable `Jansson` library for JSON support" ON)
 option(JEYSON__EXCEPTIONS_DISABLED "Disable exceptions" OFF)
 
+if (NOT PORTABLE_TARGET__CURRENT_PROJECT_DIR)
+    set(PORTABLE_TARGET__CURRENT_PROJECT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
+
 portable_target(LIBRARY ${PROJECT_NAME} ALIAS pfs::jeyson)
 
 if (NOT TARGET pfs::common)
     portable_target(INCLUDE_PROJECT
-        ${CMAKE_CURRENT_LIST_DIR}/3rdparty/pfs/common/library.cmake)
+        ${PORTABLE_TARGET__CURRENT_PROJECT_DIR}/3rdparty/pfs/common/library.cmake)
 endif()
 
 if (JEYSON__ENABLE_JANSSON AND NOT TARGET jansson)
     if (NOT JEYSON__JANSSON_ROOT)
-        set(JEYSON__JANSSON_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/jansson" CACHE INTERNAL "")
+        set(JEYSON__JANSSON_ROOT "${PORTABLE_TARGET__CURRENT_PROJECT_DIR}/3rdparty/jansson" CACHE INTERNAL "")
     endif()
 
     portable_target(INCLUDE_PROJECT
-        ${CMAKE_CURRENT_LIST_DIR}/cmake/Jansson.cmake)
+        ${PORTABLE_TARGET__CURRENT_PROJECT_DIR}/cmake/Jansson.cmake)
 
     portable_target(INCLUDE_DIRS ${PROJECT_NAME} PRIVATE $<TARGET_PROPERTY:jansson,INCLUDE_DIRECTORIES>)
 endif()
