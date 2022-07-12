@@ -19,9 +19,6 @@
 #include <cctype>
 #include <cstdlib>
 
-#define PFS__LOG_LEVEL 1
-#include <pfs/log.hpp>
-
 namespace jeyson {
 
 using BACKEND  = backend::jansson;
@@ -333,10 +330,7 @@ template <>
 json<BACKEND>::json () = default;
 
 template <>
-json<BACKEND>::json (std::nullptr_t) : rep_type(json_null())
-{
-    LOGD("", "json::json::this={}", static_cast<void const*>(this));
-}
+json<BACKEND>::json (std::nullptr_t) : rep_type(json_null()) {}
 
 template <>
 json<BACKEND>::json (bool value) : rep_type(json_boolean(value))
