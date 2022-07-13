@@ -789,7 +789,7 @@ public:
 // JSON reference
 ////////////////////////////////////////////////////////////////////////////////
 template <typename Backend = backend::jansson>
-class json_ref: public Backend::ref
+class JEYSON__EXPORT json_ref: public Backend::ref
     , public traits_interface<json_ref<Backend>>
     , public modifiers_interface<json_ref<Backend>, Backend>
     , public capacity_interface<json_ref<Backend>, Backend>
@@ -873,7 +873,7 @@ public:
 // JSON value
 ////////////////////////////////////////////////////////////////////////////////
 template <typename Backend = backend::jansson>
-class json: public Backend::rep
+class JEYSON__EXPORT json: public Backend::rep
     , public traits_interface<json<Backend>>
     , public modifiers_interface<json<Backend>, Backend>
     , public capacity_interface<json<Backend>, Backend>
@@ -1042,6 +1042,11 @@ public:
      */
     static json parse (pfs::filesystem::path const & path);
 };
+
+// #if _MSC_VER
+// JSON__EXPORT template class json_ref<backend::jansson>;
+// JSON__EXPORT template class json<backend::jansson>;
+// #endif
 
 template <typename Backend>
 bool operator == (json<Backend> const & lhs, json<Backend> const & rhs);

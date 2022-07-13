@@ -7,6 +7,7 @@
 //      2022.02.07 Initial version.
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
+#include "pfs/jeyson/exports.hpp"
 #include <memory>
 #include <string>
 #include <cstdint>
@@ -30,7 +31,7 @@ struct jansson
         json_t * _ptr {nullptr};
     };
 
-    class rep : public basic_rep
+    class JEYSON__EXPORT rep : public basic_rep
     {
     public:
         rep ();
@@ -40,7 +41,7 @@ struct jansson
         ~rep ();
     };
 
-    class ref: public basic_rep
+    class JEYSON__EXPORT ref: public basic_rep
     {
     public:
         json_t * _parent {nullptr};
