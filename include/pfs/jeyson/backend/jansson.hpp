@@ -25,6 +25,24 @@ struct jansson
     using string_type = std::string;
     using key_type    = std::string;
 
+#if _MSC_VER
+// Eliminate warning:
+// C4251: 'jeyson::backend::jansson::index_type::key': class 'std::basic_string<char,std::char_traits<char>,std::allocator<char>>' 
+// needs to have dll-interface to be used by clients of union 'jeyson::backend::jansson::index_type'
+#   pragma warning(push)
+#   pragma warning(disable: 4251)
+#endif
+    union JEYSON__EXPORT index_type {
+        size_type i {0};
+        key_type key;
+
+        index_type () {}
+        ~index_type () {}
+    };
+#if _MSC_VER
+#   pragma warning(pop)
+#endif
+
     class basic_rep
     {
     public:
@@ -45,14 +63,7 @@ struct jansson
     {
     public:
         json_t * _parent {nullptr};
-
-        union index_type {
-            size_type i;
-            key_type key;
-
-            index_type () {}
-            ~index_type () {}
-        } _index;
+        index_type _index;
 
     public:
         ref ();

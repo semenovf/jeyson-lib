@@ -36,13 +36,13 @@ using pfs::string_view;
 template <typename T, typename U = void>
 struct decoder
 {
-    T operator () () const noexcept; // default value when casting is unavailable
-    T operator () (std::nullptr_t, bool * success) const noexcept;
-    T operator () (bool, bool * success) const noexcept;
-    T operator () (std::intmax_t, bool * success) const noexcept;
-    T operator () (double, bool * success) const noexcept;
-    T operator () (string_view const &, bool * success) const noexcept;
-    T operator () (std::size_t /*container size*/, bool /*is_array*/, bool * success) const noexcept;
+    JEYSON__EXPORT T operator () () const noexcept; // default value when casting is unavailable
+    JEYSON__EXPORT T operator () (std::nullptr_t, bool * success) const noexcept;
+    JEYSON__EXPORT T operator () (bool, bool * success) const noexcept;
+    JEYSON__EXPORT T operator () (std::intmax_t, bool * success) const noexcept;
+    JEYSON__EXPORT T operator () (double, bool * success) const noexcept;
+    JEYSON__EXPORT T operator () (string_view const &, bool * success) const noexcept;
+    JEYSON__EXPORT T operator () (std::size_t /*container size*/, bool /*is_array*/, bool * success) const noexcept;
 
     T operator () (char const * s,  bool * success) const noexcept
     {
@@ -314,25 +314,25 @@ public:
     //--------------------------------------------------------------------------
 
     /// Check if JSON value is null.
-    bool is_null () const noexcept;
+    JEYSON__EXPORT bool is_null () const noexcept;
 
     /// Check if JSON value is boolean.
-    bool is_bool () const noexcept;
+    JEYSON__EXPORT bool is_bool () const noexcept;
 
     /// Check if JSON value is integer.
-    bool is_integer () const noexcept;
+    JEYSON__EXPORT bool is_integer () const noexcept;
 
     /// Check if JSON value is real.
-    bool is_real () const noexcept;
+    JEYSON__EXPORT bool is_real () const noexcept;
 
     /// Check if JSON value is string.
-    bool is_string () const noexcept;
+    JEYSON__EXPORT bool is_string () const noexcept;
 
     /// Check if JSON value is array.
-    bool is_array () const noexcept;
+    JEYSON__EXPORT bool is_array () const noexcept;
 
     /// Check if JSON value is an object.
-    bool is_object () const noexcept;
+    JEYSON__EXPORT bool is_object () const noexcept;
 
     /// Check if JSON value is scalar (neither an array nor an object) value.
     bool is_scalar () const noexcept
@@ -360,11 +360,11 @@ public:
     using key_type   = typename Backend::key_type;
 
 private:
-    void insert_helper (string_view const & key, std::nullptr_t);
-    void insert_helper (string_view const & key, bool);
-    void insert_helper (string_view const & key, std::intmax_t);
-    void insert_helper (string_view const & key, double);
-    void insert_helper (string_view const & key, string_view const & s);
+    JEYSON__EXPORT void insert_helper (string_view const & key, std::nullptr_t);
+    JEYSON__EXPORT void insert_helper (string_view const & key, bool);
+    JEYSON__EXPORT void insert_helper (string_view const & key, std::intmax_t);
+    JEYSON__EXPORT void insert_helper (string_view const & key, double);
+    JEYSON__EXPORT void insert_helper (string_view const & key, string_view const & s);
 
     void insert_helper (string_view const & key, std::string const & s)
     {
@@ -376,13 +376,13 @@ private:
         insert_helper(key, string_view{s});
     }
 
-    void insert_helper (string_view const & key, value_type const & j);
+    JEYSON__EXPORT void insert_helper (string_view const & key, value_type const & j);
 
-    void push_back_helper (std::nullptr_t);
-    void push_back_helper (bool);
-    void push_back_helper (std::intmax_t);
-    void push_back_helper (double);
-    void push_back_helper (string_view const & s);
+    JEYSON__EXPORT void push_back_helper (std::nullptr_t);
+    JEYSON__EXPORT void push_back_helper (bool);
+    JEYSON__EXPORT void push_back_helper (std::intmax_t);
+    JEYSON__EXPORT void push_back_helper (double);
+    JEYSON__EXPORT void push_back_helper (string_view const & s);
 
     void push_back_helper (std::string const & s)
     {
@@ -394,7 +394,7 @@ private:
         push_back_helper(string_view{s});
     }
 
-    void push_back_helper (value_type const & j);
+    JEYSON__EXPORT void push_back_helper (value_type const & j);
 
 public:
     /**
@@ -450,7 +450,7 @@ public:
      * Inserts @a value into the object overriding if the object already contains
      * an element with an equivalent key.
      */
-    void insert (key_type const & key, value_type && value);
+    JEYSON__EXPORT void insert (key_type const & key, value_type && value);
 
     /**
      * Appends the given element @a value to the end of the array.
@@ -483,7 +483,7 @@ public:
      *         and it is not an error.
      * @throw @c error { @c errc::backend_error } if backend call(s) results a failure.
      */
-    void push_back (value_type && value);
+    JEYSON__EXPORT void push_back (value_type && value);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -501,7 +501,7 @@ public:
      * or object), @c 1 if value is scalar and @c 0 if value is uninitialized
      * or container is empty.
      */
-    size_type size () const noexcept;
+    JEYSON__EXPORT size_type size () const noexcept;
 
     /**
      * Checks when the size is equal to zero.
@@ -522,7 +522,7 @@ public:
     //--------------------------------------------------------------------------
     // Stringification
     //--------------------------------------------------------------------------
-    std::string to_string () const;
+    JEYSON__EXPORT std::string to_string () const;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -541,7 +541,7 @@ public:
      * Returns a reference to the element at specified location @a pos.
      * In case of out of bounds, the result is a reference to an invalid value.
      */
-    reference operator [] (size_type pos) noexcept;
+    JEYSON__EXPORT reference operator [] (size_type pos) noexcept;
 
     /**
      * Returns a reference to the element at specified location @a pos.
@@ -565,7 +565,7 @@ public:
      * Returns a reference to the value that is mapped to a key equivalent
      * to @a key, performing an insertion if such key does not already exist.
      */
-    reference operator [] (string_view) noexcept;
+    JEYSON__EXPORT reference operator [] (string_view) noexcept;
 
     reference operator [] (key_type const & key) noexcept
     {
@@ -595,7 +595,7 @@ public:
      * Returns a constant reference to the element at specified location @a pos.
      * In case of out of bounds, the result is a reference to an invalid value.
      */
-    const_reference operator [] (size_type pos) const noexcept;
+    JEYSON__EXPORT const_reference operator [] (size_type pos) const noexcept;
 
     /**
      * Returns a constant reference to the element at specified location @a pos.
@@ -619,7 +619,7 @@ public:
      * to @a key. In case of out of range, the result is a reference to an
      * invalid value.
      */
-    const_reference operator [] (string_view key) const noexcept;
+    JEYSON__EXPORT const_reference operator [] (string_view key) const noexcept;
 
     const_reference operator [] (key_type const & key) const noexcept
     {
@@ -638,7 +638,7 @@ public:
      *        or it is not an array.
      * @throw @c error { @c errc::out_of_range } if @a pos is out of bounds.
      */
-    reference at (size_type pos) const;
+    JEYSON__EXPORT reference at (size_type pos) const;
 
     /**
      * Returns a reference to the element at specified location @a pos.
@@ -661,7 +661,7 @@ public:
      *        or it is not an object.
      * @throw @c error { @c errc::out_of_range } if an element by @a key not found.
      */
-    reference at (string_view key) const;
+    JEYSON__EXPORT reference at (string_view key) const;
 
     reference at (key_type const & key) const
     {
@@ -679,7 +679,7 @@ public:
      * @note This method is applicable only for objects, in other cases it
      *       returns @c false.
      */
-    bool contains (string_view key) const;
+    JEYSON__EXPORT bool contains (string_view key) const;
 
     bool contains (key_type const & key) const
     {
@@ -705,12 +705,12 @@ public:
     using const_reference = json_ref<Backend> const;
 
 private:
-    bool bool_value () const noexcept;
-    std::intmax_t integer_value () const noexcept;
-    double real_value () const noexcept;
-    string_view string_value () const noexcept;
-    std::size_t array_size () const noexcept;
-    std::size_t object_size () const noexcept;
+    JEYSON__EXPORT bool bool_value () const noexcept;
+    JEYSON__EXPORT std::intmax_t integer_value () const noexcept;
+    JEYSON__EXPORT double real_value () const noexcept;
+    JEYSON__EXPORT string_view string_value () const noexcept;
+    JEYSON__EXPORT std::size_t array_size () const noexcept;
+    JEYSON__EXPORT std::size_t object_size () const noexcept;
 
 public:
     /**
@@ -789,7 +789,7 @@ public:
 // JSON reference
 ////////////////////////////////////////////////////////////////////////////////
 template <typename Backend = backend::jansson>
-class JEYSON__EXPORT json_ref: public Backend::ref
+class json_ref: public Backend::ref
     , public traits_interface<json_ref<Backend>>
     , public modifiers_interface<json_ref<Backend>, Backend>
     , public capacity_interface<json_ref<Backend>, Backend>
@@ -813,13 +813,13 @@ public:
     using const_reference = json_ref<Backend> const;
 
 private:
-    json_ref ();
+    JEYSON__EXPORT json_ref ();
 
-    void assign_helper (std::nullptr_t);
-    void assign_helper (bool);
-    void assign_helper (std::intmax_t);
-    void assign_helper (double);
-    void assign_helper (string_view const & s);
+    JEYSON__EXPORT void assign_helper (std::nullptr_t);
+    JEYSON__EXPORT void assign_helper (bool);
+    JEYSON__EXPORT void assign_helper (std::intmax_t);
+    JEYSON__EXPORT void assign_helper (double);
+    JEYSON__EXPORT void assign_helper (string_view const & s);
 
     void assign_helper (std::string const & s)
     {
@@ -836,20 +836,20 @@ public:
     using element_accessor_interface<json_ref<Backend>, Backend>::operator [];
 
 public:
-    json_ref (typename Backend::ref &&);
-    json_ref (json_ref const &);
-    json_ref (json_ref &&);
-    explicit json_ref (json<Backend> &);
-    explicit json_ref (json<Backend> &&);
-    ~json_ref ();
+    JEYSON__EXPORT json_ref (typename Backend::ref &&);
+    JEYSON__EXPORT json_ref (json_ref const &);
+    JEYSON__EXPORT json_ref (json_ref &&);
+    explicit JEYSON__EXPORT json_ref (json<Backend> &);
+    explicit JEYSON__EXPORT json_ref (json<Backend> &&);
+    JEYSON__EXPORT ~json_ref ();
 
     /// Check if JSON reference is valid.
-    operator bool () const noexcept;
+    JEYSON__EXPORT operator bool () const noexcept;
 
-    json_ref & operator = (json_ref const & j);
-    json_ref & operator = (json_ref && j);
-    json_ref & operator = (json<Backend> const & j);
-    json_ref & operator = (json<Backend> && j);
+    JEYSON__EXPORT json_ref & operator = (json_ref const & j);
+    JEYSON__EXPORT json_ref & operator = (json_ref && j);
+    JEYSON__EXPORT json_ref & operator = (json<Backend> const & j);
+    JEYSON__EXPORT json_ref & operator = (json<Backend> && j);
 
     template <typename T>
     json_ref & operator = (T const & value)
@@ -866,14 +866,14 @@ public:
         return *this;
     }
 
-    void swap (json_ref & other);
+    JEYSON__EXPORT void swap (json_ref & other);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 // JSON value
 ////////////////////////////////////////////////////////////////////////////////
 template <typename Backend = backend::jansson>
-class JEYSON__EXPORT json: public Backend::rep
+class json: public Backend::rep
     , public traits_interface<json<Backend>>
     , public modifiers_interface<json<Backend>, Backend>
     , public capacity_interface<json<Backend>, Backend>
@@ -892,11 +892,11 @@ public:
     using const_reference = json_ref<Backend> const;
 
 private:
-    void assign_helper (std::nullptr_t);
-    void assign_helper (bool);
-    void assign_helper (std::intmax_t);
-    void assign_helper (double);
-    void assign_helper (string_view const & s);
+    JEYSON__EXPORT void assign_helper (std::nullptr_t);
+    JEYSON__EXPORT void assign_helper (bool);
+    JEYSON__EXPORT void assign_helper (std::intmax_t);
+    JEYSON__EXPORT void assign_helper (double);
+    JEYSON__EXPORT void assign_helper (string_view const & s);
 
     void assign_helper (std::string const & s)
     {
@@ -916,21 +916,21 @@ public:
 
 public:
     /// Check if JSON value is initialized.
-    operator bool () const noexcept;
+    JEYSON__EXPORT operator bool () const noexcept;
 
     //--------------------------------------------------------------------------
     // Constructors, destructors, assignment operators
     //--------------------------------------------------------------------------
-    json ();
+    JEYSON__EXPORT json ();
 
     /// Construct @c null value.
-    explicit json (std::nullptr_t);
+    explicit JEYSON__EXPORT json (std::nullptr_t);
 
     /// Construct boolean value.
-    explicit json (bool value);
+    explicit JEYSON__EXPORT json (bool value);
 
     /// Construct integer value.
-    explicit json (std::intmax_t value);
+    explicit JEYSON__EXPORT json (std::intmax_t value);
 
     /// Construct from any integral type (bool, char, int, etc).
     template <typename T>
@@ -939,7 +939,7 @@ public:
     {}
 
     /// Construct real value from @c double.
-    explicit json (double value);
+    explicit JEYSON__EXPORT json (double value);
 
     /// Construct from any floating point type.
     template <typename T>
@@ -948,7 +948,7 @@ public:
     {}
 
     /// Construct string value.
-    explicit json (string_view const & s);
+    explicit JEYSON__EXPORT json (string_view const & s);
 
     /// Construct string value.
     explicit json (string_type const & value)
@@ -968,17 +968,17 @@ public:
         : json(string_view{value, n})
     {}
 
-    json (json const & other);
-    json (json && other);
-    explicit json (reference const & other);
-    explicit json (reference && other);
+    JEYSON__EXPORT json (json const & other);
+    JEYSON__EXPORT json (json && other);
+    JEYSON__EXPORT explicit json (reference const & other);
+    JEYSON__EXPORT explicit json (reference && other);
 
-    ~json ();
+    JEYSON__EXPORT ~json ();
 
-    json & operator = (json const & other);
-    json & operator = (json && other);
-    json & operator = (reference const & other);
-    json & operator = (reference && other);
+    JEYSON__EXPORT json & operator = (json const & other);
+    JEYSON__EXPORT json & operator = (json && other);
+    JEYSON__EXPORT json & operator = (reference const & other);
+    JEYSON__EXPORT json & operator = (reference && other);
 
     template <typename T>
     json & operator = (T const & value)
@@ -1001,7 +1001,7 @@ public:
     /**
      * Exchanges the contents of the JSON value with those of @a other.
      */
-    void swap (json & other);
+    JEYSON__EXPORT void swap (json & other);
 
     //--------------------------------------------------------------------------
     // Save
@@ -1018,7 +1018,7 @@ public:
      *
      * @throw @c error { @c errc::backend_error } if backend call(s) results a failure.
      */
-    void save (pfs::filesystem::path const & path
+    JEYSON__EXPORT void save (pfs::filesystem::path const & path
         , bool compact = false
         , int indent = 4
         , int precision = 17);
@@ -1035,21 +1035,20 @@ public:
     /**
      * Decodes JSON from string
      */
-    static json parse (std::string const & source);
+    static JEYSON__EXPORT json parse (std::string const & source);
 
     /**
      * Decodes JSON from file
      */
-    static json parse (pfs::filesystem::path const & path);
+    static JEYSON__EXPORT json parse (pfs::filesystem::path const & path);
 };
-
-// #if _MSC_VER
-// JSON__EXPORT template class json_ref<backend::jansson>;
-// JSON__EXPORT template class json<backend::jansson>;
-// #endif
 
 template <typename Backend>
 bool operator == (json<Backend> const & lhs, json<Backend> const & rhs);
+
+template <>
+JEYSON__EXPORT bool operator == <backend::jansson> (json<backend::jansson> const & lhs
+    , json<backend::jansson> const & rhs);
 
 template <typename Backend>
 inline bool operator != (json<Backend> const & lhs, json<Backend> const & rhs)
