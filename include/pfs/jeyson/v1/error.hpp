@@ -12,9 +12,6 @@
 
 namespace jeyson {
 
-#define JEYSON__ASSERT(condition, message) PFS__ASSERT(condition, message)
-#define JEYSON__THROW(x) PFS__THROW(x)
-
 enum class errc
 {
       success = 0

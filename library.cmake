@@ -10,7 +10,6 @@ cmake_minimum_required (VERSION 3.11)
 project(jeyson C CXX)
 
 option(JEYSON__ENABLE_JANSSON "Enable `Jansson` library for JSON support" ON)
-option(JEYSON__EXCEPTIONS_DISABLED "Disable exceptions" OFF)
 
 if (NOT PORTABLE_TARGET__CURRENT_PROJECT_DIR)
     set(PORTABLE_TARGET__CURRENT_PROJECT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
@@ -38,11 +37,6 @@ endif()
 portable_target(INCLUDE_DIRS ${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 portable_target(LINK ${PROJECT_NAME} PUBLIC pfs::common)
 portable_target(LINK ${PROJECT_NAME}-static PUBLIC pfs::common)
-
-if (JEYSON__EXCEPTIONS_DISABLED)
-    portable_target(DEFINITIONS ${PROJECT_NAME} PUBLIC "JEYSON__EXCEPTIONS_DISABLED=1")
-    portable_target(DEFINITIONS ${PROJECT_NAME}-static PUBLIC "JEYSON__EXCEPTIONS_DISABLED=1")
-endif()
 
 if (JEYSON__ENABLE_JANSSON)
     portable_target(SOURCES ${PROJECT_NAME}

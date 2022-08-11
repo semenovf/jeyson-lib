@@ -369,7 +369,6 @@ TEST_CASE("Cast") {
     }
 
     {
-#if PFS__EXCEPTIONS_ENABLED
         // String
         auto sample_value = json_value::string_type("hello");
         json_value v(sample_value);
@@ -388,7 +387,6 @@ TEST_CASE("Cast") {
         CHECK_THROWS_AS(v.get<float>(), std::system_error);
         CHECK_THROWS_AS(v.get<double>(), std::system_error);
         CHECK(v.get<json_value::string_type>() == sample_value);
-#endif
     }
 }
 

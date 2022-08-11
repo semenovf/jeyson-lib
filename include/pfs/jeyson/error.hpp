@@ -8,15 +8,9 @@
 //      2022.02.07 Initial version (jeyson-lib).
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
-#ifndef JEYSON__EXCEPTIONS_DISABLED
-#   define PFS__EXCEPTIONS_ENABLED 1
-#endif
 #include "pfs/error.hpp"
 
 namespace jeyson {
-
-#define JEYSON__ASSERT(condition, message) PFS__ASSERT(condition, message)
-#define JEYSON__THROW(x) PFS__THROW(x)
 
 enum class errc
 {

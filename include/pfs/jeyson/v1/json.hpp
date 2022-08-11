@@ -425,7 +425,7 @@ public:
         }
 
         if (!is_array())
-            JEYSON__THROW(error{errc::type_error});
+            throw error {errc::type_error};
 
         if (pos >= _value.array_value->size()) {
             _value.array_value->insert(_value.array_value->end()
@@ -439,7 +439,7 @@ public:
     const_reference operator [] (size_type pos) const
     {
         if (!is_array())
-            JEYSON__THROW(error{errc::type_error});
+            throw error{errc::type_error};
 
         return _value.array_value->operator[](pos);
     }
@@ -452,7 +452,7 @@ public:
         }
 
         if (!is_object())
-            JEYSON__THROW(error{errc::type_error});
+            throw error {errc::type_error};
 
         return _value.object_value->operator[](key);
     }
@@ -460,7 +460,7 @@ public:
     const_reference operator [] (typename object_type::key_type const & key) const
     {
         if (!is_object())
-            JEYSON__THROW(error{errc::type_error});
+            throw error {errc::type_error};
 
         return _value.object_value->find(key)->second;
     }
@@ -489,7 +489,7 @@ public:
                 break;
         }
 
-        JEYSON__THROW(error{errc::type_cast_error});
+        throw error {errc::type_cast_error};
         return T{};
     }
 
@@ -508,7 +508,7 @@ public:
             default: break;
         }
 
-        JEYSON__THROW(error{errc::type_cast_error});
+        throw error {errc::type_cast_error};
         return T{};
     }
 
@@ -527,7 +527,7 @@ public:
             default: break;
         }
 
-        JEYSON__THROW(error{errc::type_cast_error});
+        throw error {errc::type_cast_error};
         return T{};
     }
 
@@ -544,7 +544,7 @@ public:
             default: break;
         }
 
-        JEYSON__THROW(error{errc::type_cast_error});
+        throw error {errc::type_cast_error};
         return T();
     }
 
@@ -564,7 +564,7 @@ public:
             default: break;
         }
 
-        JEYSON__THROW(error{errc::type_cast_error});
+        throw error {errc::type_cast_error};
         return T();
     }
 

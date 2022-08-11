@@ -10,6 +10,7 @@
 #include "pfs/jeyson/json.hpp"
 #include "pfs/jeyson/error.hpp"
 #include "pfs/jeyson/backend/jansson.hpp"
+#include "pfs/assert.hpp"
 #include "pfs/fmt.hpp"
 #include <jansson.h>
 #include <algorithm>
@@ -197,10 +198,8 @@ void swap (jansson::ref & a, jansson::ref & b)
 // value must be a new reference
 void assign (jansson::rep & rep, json_t * value)
 {
-    if (!value) {
-        JEYSON__THROW((error{errc::invalid_argument
-            , "Attempt to assign null value"}));
-    }
+    if (!value)
+        throw error {errc::invalid_argument, "attempt to assign null value"};
 
     if (rep._ptr) {
         json_decref(rep._ptr);
@@ -213,10 +212,8 @@ void assign (jansson::rep & rep, json_t * value)
 // value must be a new reference
 void assign (jansson::ref & ref, json_t * value)
 {
-    if (!value) {
-        JEYSON__THROW((error{errc::invalid_argument
-            , "Attempt to assign null value"}));
-    }
+    if (!value)
+        throw error {errc::invalid_argument, "attempt to assign null value"};
 
     if (ref._ptr) {
         json_decref(ref._ptr);
@@ -228,11 +225,8 @@ void assign (jansson::ref & ref, json_t * value)
             // Do not steal reference
             auto rc = json_array_set(ref._parent, ref._index.i, value);
 
-            if (rc != 0) {
-                JEYSON__THROW((error{
-                      errc::backend_error
-                    , "Replace array element failure"}));
-            }
+            if (rc != 0)
+                throw error {errc::backend_error, "replace array element failure"};
 
             // Not need `json_incref(value)`, we use non-steal variant of
             // `json_array_set()` function
@@ -243,19 +237,14 @@ void assign (jansson::ref & ref, json_t * value)
                 , ref._index.key.size()
                 , value);
 
-            if (rc != 0) {
-                JEYSON__THROW((error{
-                      errc::backend_error
-                    , "Replace object element failure"}));
-            }
+            if (rc != 0)
+                throw error {errc::backend_error, "replace object element failure"};
 
             // Not need `json_incref(value)`, we use non-steal variant of
             // `json_object_setn_nocheck()` function
             ref._ptr = value;
         } else {
-            JEYSON__THROW((error{
-                   errc::incopatible_type
-                , "Expected array or object for parent"}));
+            throw error {errc::incopatible_type, "array or object expected for parent"};
         }
     } else {
         ref._ptr = value;
@@ -265,43 +254,32 @@ void assign (jansson::ref & ref, json_t * value)
 // value must be a new reference
 void insert (json_t * obj, string_view const & key, json_t * value)
 {
-    if (!value) {
-        JEYSON__THROW((error{errc::invalid_argument
-            , "Attempt to insert null value"}));
-    }
+    if (!value)
+        throw error {errc::invalid_argument, "attempt to insert null value"};
 
-    if (!json_is_object(obj)) {
-        error err{errc::incopatible_type, "Object expected"};
-        JEYSON__THROW(err);
-    }
+    if (!json_is_object(obj))
+        throw error {errc::incopatible_type, "object expected"};
 
     auto rc = json_object_setn_new_nocheck(obj, key.data(), key.size(), value);
 
-    if (rc != 0) {
-        error err{errc::backend_error, "object insertion failure"};
-        JEYSON__THROW(err);
-    }
+    if (rc != 0)
+        throw error {errc::backend_error, "object insertion failure"};
 }
 
 // value must be a new reference
 void push_back (json_t * arr, json_t * value)
 {
-    if (!value) {
-        JEYSON__THROW((error{errc::invalid_argument
-            , "Attempt to push back null value"}));
-    }
+    if (!value)
+        throw error {errc::invalid_argument
+            , "attempt to push back null value"};
 
-    if (!json_is_array(arr)) {
-        error err{errc::incopatible_type, "Array expected"};
-        JEYSON__THROW(err);
-    }
+    if (!json_is_array(arr))
+        throw error {errc::incopatible_type, "array expected"};
 
     auto rc = json_array_append_new(arr, value);
 
-    if (rc != 0) {
-        error err{errc::backend_error, "Array append failure"};
-        JEYSON__THROW(err);
-    }
+    if (rc != 0)
+        throw error {errc::backend_error, "array append failure"};
 }
 
 } // namespace backend
@@ -521,12 +499,11 @@ void json<BACKEND>::save (pfs::filesystem::path const & path
         , flags);
 
     if (rc < 0) {
-        error err {
+        throw error {
               errc::backend_error
             , fmt::format("save JSON representation to file `{}` failure"
                 , pfs::filesystem::utf8_encode(path))
         };
-        JEYSON__THROW(err);
     }
 }
 
@@ -542,13 +519,11 @@ json<BACKEND>::parse (std::string const & source)
     auto j = json_loads(source.c_str(), JSON_DECODE_ANY, & jerror);
 
     if (!j) {
-        error err {
+        throw error {
               errc::backend_error
             , fmt::format("parse error at line {}", jerror.line)
             , jerror.text
         };
-
-        JEYSON__THROW(err);
     }
 
     json<BACKEND> result;
@@ -570,14 +545,12 @@ json<BACKEND>::parse (pfs::filesystem::path const & path)
         , & jerror);
 
     if (!j) {
-        error err{
+        throw error {
               errc::backend_error
             , fmt::format("parse error at line {} in file `{}`"
                 , jerror.line
                 , pfs::filesystem::utf8_encode(path))
             , jerror.text};
-
-        JEYSON__THROW(err);
     }
 
     json<BACKEND> result;
@@ -890,35 +863,27 @@ modifiers_interface<Derived, Backend>::insert_helper (string_view const & key
 {
     auto self = static_cast<Derived *>(this);
 
-    if (!value) {
-        error err {errc::invalid_argument, "attempt to insert unitialized value"};
-        JEYSON__THROW(err);
-    }
+    if (!value)
+        throw error {errc::invalid_argument, "attempt to insert unitialized value"};
 
     if (!INATIVE(*self))
         INATIVE(*self) = json_object();
 
-    if (!json_is_object(INATIVE(*self))) {
-        error err{errc::incopatible_type, "object expected"};
-        JEYSON__THROW(err);
-    }
+    if (!json_is_object(INATIVE(*self)))
+        throw error {errc::incopatible_type, "object expected"};
 
     auto copy = json_deep_copy(NATIVE(value));
 
-    if (!copy) {
-        error err{errc::backend_error, "deep copy failure"};
-        JEYSON__THROW(err);
-    }
+    if (!copy)
+        throw error {errc::backend_error, "deep copy failure"};
 
     auto rc = json_object_setn_new_nocheck(INATIVE(*self)
         , key.data()
         , key.size()
         , copy);
 
-    if (rc != 0) {
-        error err{errc::backend_error, "object insertion failure"};
-        JEYSON__THROW(err);
-    }
+    if (rc != 0)
+        throw error {errc::backend_error, "object insertion failure"};
 }
 
 template void modifiers_interface<JSON, BACKEND>::insert_helper (string_view const &, value_type const &);
@@ -930,28 +895,22 @@ modifiers_interface<Derived, Backend>::insert (key_type const & key, value_type 
 {
     auto self = static_cast<Derived *>(this);
 
-    if (!value) {
-        error err {errc::invalid_argument, "attempt to insert unitialized value"};
-        JEYSON__THROW(err);
-    }
+    if (!value)
+        throw error {errc::invalid_argument, "attempt to insert unitialized value"};
 
     if (!INATIVE(*self))
         INATIVE(*self) = json_object();
 
-    if (!json_is_object(INATIVE(*self))) {
-        error err{errc::incopatible_type, "object expected"};
-        JEYSON__THROW(err);
-    }
+    if (!json_is_object(INATIVE(*self)))
+        throw error {errc::incopatible_type, "object expected"};
 
     auto rc = json_object_setn_new_nocheck(INATIVE(*self)
         , key.c_str()
         , key.size()
         , NATIVE(value));
 
-    if (rc != 0) {
-        error err{errc::backend_error, "object insertion failure"};
-        JEYSON__THROW(err);
-    }
+    if (rc != 0)
+        throw error {errc::backend_error, "object insertion failure"};
 
     NATIVE(value) = nullptr;
 }
@@ -1040,32 +999,24 @@ modifiers_interface<Derived, Backend>::push_back_helper (value_type const & valu
 {
     auto self = static_cast<Derived *>(this);
 
-    if (!value) {
-        error err {errc::invalid_argument, "Attempt to add unitialized value"};
-        JEYSON__THROW(err);
-    }
+    if (!value)
+        throw error {errc::invalid_argument, "attempt to add unitialized value"};
 
     if (! INATIVE(*self))
         INATIVE(*self) = json_array();
 
-    if (!json_is_array(INATIVE(*self))) {
-        error err{errc::incopatible_type, "Array expected"};
-        JEYSON__THROW(err);
-    }
+    if (!json_is_array(INATIVE(*self)))
+        throw error {errc::incopatible_type, "array expected"};
 
     auto copy = json_deep_copy(NATIVE(value));
 
-    if (!copy) {
-        error err{errc::backend_error, "Deep copy failure"};
-        JEYSON__THROW(err);
-    }
+    if (!copy)
+        throw error {errc::backend_error, "deep copy failure"};
 
     auto rc = json_array_append_new(INATIVE(*self), copy);
 
-    if (rc != 0) {
-        error err{errc::backend_error, "Array append failure"};
-        JEYSON__THROW(err);
-    }
+    if (rc != 0)
+        throw error {errc::backend_error, "array append failure"};
 }
 
 template void modifiers_interface<JSON, BACKEND>::push_back_helper (value_type const &);
@@ -1077,25 +1028,19 @@ modifiers_interface<Derived, Backend>::push_back (value_type && value)
 {
     auto self = static_cast<Derived *>(this);
 
-    if (!value) {
-        error err {errc::invalid_argument, "Attempt to add unitialized value"};
-        JEYSON__THROW(err);
-    }
+    if (!value)
+        throw error {errc::invalid_argument, "attempt to add unitialized value"};
 
     if (! INATIVE(*self))
         INATIVE(*self) = json_array();
 
-    if (!json_is_array(INATIVE(*self))) {
-        error err{errc::incopatible_type, "Array expected"};
-        JEYSON__THROW(err);
-    }
+    if (!json_is_array(INATIVE(*self)))
+        throw error {errc::incopatible_type, "array expected"};
 
     auto rc = json_array_append_new(INATIVE(*self), NATIVE(value));
 
-    if (rc != 0) {
-        error err{errc::backend_error, "Array append failure"};
-        JEYSON__THROW(err);
-    }
+    if (rc != 0)
+        throw error {errc::backend_error, "array append failure"};
 
     NATIVE(value) = nullptr;
 }
@@ -1150,10 +1095,8 @@ converter_interface<Derived>::to_string () const
         auto rc = json_dump_callback(CINATIVE(*self)
             , json_dump_callback, & result, JSON_COMPACT | JSON_ENCODE_ANY);
 
-        if (rc != 0) {
-            error err{errc::backend_error, "stringification failure"};
-            JEYSON__THROW(err);
-        }
+        if (rc != 0)
+            throw error {errc::backend_error, "stringification failure"};
     }
 
     return result;
@@ -1494,7 +1437,7 @@ mutable_element_accessor_interface<JSON, BACKEND>::operator [] (size_type pos) n
         // Fill with null values
         while (json_array_size(INATIVE(*self)) <= pos) {
             auto rc = json_array_append_new(INATIVE(*self), json_null());
-            JEYSON__ASSERT(rc == 0, "json_array_append_new() failure");
+            PFS__ASSERT(rc == 0, "json_array_append_new() failure");
         }
     }
 
@@ -1535,7 +1478,7 @@ mutable_element_accessor_interface<JSON, BACKEND>::operator [] (string_view key)
         // Return borrowed reference.
         ptr = json_object_getn(INATIVE(*self), key.data(), key.length());
 
-        JEYSON__ASSERT(ptr, "");
+        PFS__ASSERT(ptr, "");
     }
 
     return reference{BACKEND::ref{ptr, INATIVE(*self), key_type(key.data(), key.length())}};
@@ -1560,7 +1503,7 @@ mutable_element_accessor_interface<JSON_REF, BACKEND>::operator [] (size_type po
         // Fill with null values
         while (json_array_size(INATIVE(*self)) <= pos) {
             auto rc = json_array_append_new(INATIVE(*self), json_null());
-            JEYSON__ASSERT(rc == 0, "json_array_append_new() failure");
+            PFS__ASSERT(rc == 0, "json_array_append_new() failure");
         }
     }
 
@@ -1601,7 +1544,7 @@ mutable_element_accessor_interface<JSON_REF, BACKEND>::operator [] (string_view 
         // Return borrowed reference.
         ptr = json_object_getn(INATIVE(*self), key.data(), key.length());
 
-        JEYSON__ASSERT(ptr, "");
+        PFS__ASSERT(ptr, "");
     }
 
     return reference{BACKEND::ref{ptr, INATIVE(*self), key_type(key.data(), key.length())}};
@@ -1613,7 +1556,7 @@ mutable_element_accessor_interface<JSON_REF, BACKEND>::operator [] (string_view 
 
 template <typename Derived, typename Backend>
 // Specify an explicit return type to avoid:
-// error C2244: 'jeyson::element_accessor_interface<Derived,Backend>::operator []': 
+// error C2244: 'jeyson::element_accessor_interface<Derived,Backend>::operator []':
 // unable to match function definition to an existing declaration
 //typename element_accessor_interface<Derived, Backend>::const_reference
 json_ref<Backend> const
@@ -1663,17 +1606,13 @@ element_accessor_interface<Derived, Backend>::at (size_type pos) const
 {
     auto self = static_cast<Derived const *>(this);
 
-    if (!CINATIVE(*self) || !json_is_array(CINATIVE(*self))) {
-        error err{errc::incopatible_type, "array expected"};
-        JEYSON__THROW(err);
-    }
+    if (!CINATIVE(*self) || !json_is_array(CINATIVE(*self)))
+        throw error {errc::incopatible_type, "array expected"};
 
     auto ptr = json_array_get(CINATIVE(*self), pos);
 
-    if (!ptr) {
-        error err{errc::out_of_range};
-        JEYSON__THROW(err);
-    }
+    if (!ptr)
+        throw error {errc::out_of_range};
 
     return reference{BACKEND::ref{ptr, CINATIVE(*self), pos}};
 }
@@ -1687,17 +1626,13 @@ element_accessor_interface<Derived, Backend>::at (string_view key) const
 {
     auto self = static_cast<Derived const *>(this);
 
-    if (!CINATIVE(*self) || !json_is_object(CINATIVE(*self))) {
-        error err{errc::incopatible_type, "object expected"};
-        JEYSON__THROW(err);
-    }
+    if (!CINATIVE(*self) || !json_is_object(CINATIVE(*self)))
+        throw error {errc::incopatible_type, "object expected"};
 
     auto ptr = json_object_getn(CINATIVE(*self), key.data(), key.length());
 
-    if (!ptr) {
-        error err{errc::out_of_range};
-        JEYSON__THROW(err);
-    }
+    if (!ptr)
+        throw error {errc::out_of_range};
 
     return reference{BACKEND::ref{ptr, CINATIVE(*self)
         , key_type(key.data(), key.length())}};
@@ -1731,7 +1666,7 @@ getter_interface<Derived, Backend>::bool_value () const noexcept
 {
     auto self = static_cast<Derived const *>(this);
 
-    JEYSON__ASSERT(json_is_boolean(CINATIVE(*self)), "Boolean value expected");
+    PFS__ASSERT(json_is_boolean(CINATIVE(*self)), "boolean value expected");
     return json_is_true(CINATIVE(*self)) ? true : false;
 }
 
@@ -1744,7 +1679,7 @@ getter_interface<Derived, Backend>::integer_value () const noexcept
 {
     auto self = static_cast<Derived const *>(this);
 
-    JEYSON__ASSERT(json_is_integer(CINATIVE(*self)), "Integer value expected");
+    PFS__ASSERT(json_is_integer(CINATIVE(*self)), "integer value expected");
     return static_cast<std::intmax_t>(json_integer_value(CINATIVE(*self)));
 }
 
@@ -1757,7 +1692,7 @@ getter_interface<Derived, Backend>::real_value () const noexcept
 {
     auto self = static_cast<Derived const *>(this);
 
-    JEYSON__ASSERT(json_is_real(CINATIVE(*self)), "Real value expected");
+    PFS__ASSERT(json_is_real(CINATIVE(*self)), "real value expected");
     return json_real_value(CINATIVE(*self));
 }
 
@@ -1770,7 +1705,7 @@ getter_interface<Derived, Backend>::string_value () const noexcept
 {
     auto self = static_cast<Derived const *>(this);
 
-    JEYSON__ASSERT(json_is_string(CINATIVE(*self)), "String value expected");
+    PFS__ASSERT(json_is_string(CINATIVE(*self)), "string value expected");
     return string_view(json_string_value(CINATIVE(*self))
         , json_string_length(CINATIVE(*self)));
 }
@@ -1784,7 +1719,7 @@ getter_interface<Derived, Backend>::array_size () const noexcept
 {
     auto self = static_cast<Derived const *>(this);
 
-    JEYSON__ASSERT(json_is_array(CINATIVE(*self)), "Array expected");
+    PFS__ASSERT(json_is_array(CINATIVE(*self)), "array expected");
     return json_array_size(CINATIVE(*self));
 }
 
@@ -1797,7 +1732,7 @@ getter_interface<Derived, Backend>::object_size () const noexcept
 {
     auto self = static_cast<Derived const *>(this);
 
-    JEYSON__ASSERT(json_is_object(CINATIVE(*self)), "Object expected");
+    PFS__ASSERT(json_is_object(CINATIVE(*self)), "object expected");
     return json_object_size(CINATIVE(*self));
 }
 

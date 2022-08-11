@@ -760,7 +760,7 @@ public:
         auto result = get<T>(success);
 
         if (!success)
-            JEYSON__THROW(error{errc::incopatible_type});
+            throw error {errc::incopatible_type};
 
         return result;
     }
