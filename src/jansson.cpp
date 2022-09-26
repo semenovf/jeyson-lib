@@ -1739,4 +1739,48 @@ getter_interface<Derived, Backend>::object_size () const noexcept
 template std::size_t getter_interface<JSON, BACKEND>::object_size () const noexcept;
 template std::size_t getter_interface<JSON_REF, BACKEND>::object_size () const noexcept;
 
+////////////////////////////////////////////////////////////////////////////////
+// Algorithm interface
+////////////////////////////////////////////////////////////////////////////////
+template <typename Derived, typename Backend>
+void
+algoritm_interface<Derived, Backend>::for_each (std::function<void (reference)> f) const noexcept
+{
+    auto self = static_cast<Derived const *>(this);
+
+    if (!CINATIVE(*self))
+        return;
+
+    if (json_is_object(CINATIVE(*self))) {
+        char const * key;
+        json_t * ptr;
+
+        json_object_foreach (CINATIVE(*self), key, ptr) {
+            f(reference{
+                typename Backend::ref{
+                      ptr
+                    , CINATIVE(*self)
+                    , std::string(key)
+                }
+            });
+        }
+    } else if (json_is_array(CINATIVE(*self))) {
+        std::size_t index;
+        json_t * ptr;
+
+        json_array_foreach(CINATIVE(*self), index, ptr) {
+            f(reference{
+                typename Backend::ref{
+                      ptr
+                    , CINATIVE(*self)
+                    , index
+                }
+            });
+        }
+    }
+}
+
+template void algoritm_interface<JSON, BACKEND>::for_each (std::function<void (reference)> f) const noexcept;
+template void algoritm_interface<JSON_REF, BACKEND>::for_each (std::function<void (reference)> f) const noexcept;
+
 } // namespace jeyson

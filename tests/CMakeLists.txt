@@ -6,13 +6,14 @@
 # Changelog:
 #      2019.12.11 Initial version.
 #      2022.02.07 Refactored for using portable_target `ADD_TEST`.
+#      2022.09.26 Added `iterator` test.
 ################################################################################
 project(jeyson-TESTS)
 
 # Copy test files to build folder
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION .)
 
-set(TESTS json)
+set(TESTS json iterator)
 
 foreach (t ${TESTS})
     portable_target(ADD_TEST ${t}
@@ -20,16 +21,3 @@ foreach (t ${TESTS})
         SOURCES ${t}.cpp ${${t}_SOURCES}
         LINK pfs::jeyson)
 endforeach()
-
-# set(V1_TESTS
-#     json
-#     iterator
-#     parser
-#     file_parser)
-#
-# foreach (t ${V1_TESTS})
-#     portable_target(ADD_TEST v1_${t}
-#         ENABLE_COVERAGE ${JEYSON__ENABLE_COVERAGE}
-#         SOURCES v1/${t}.cpp ${${t}_SOURCES}
-#         LINK pfs::jeyson)
-# endforeach()

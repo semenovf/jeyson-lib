@@ -931,6 +931,65 @@ void run_parsing_tests ()
 }
 
 template <typename Backend>
+void run_algorithm_tests ()
+{
+    using json = jeyson::json<Backend>;
+    using json_ref = jeyson::json_ref<Backend>;
+
+    // Unitialized value
+    {
+        json j;
+        int counter = 0;
+        j.for_each([& counter] (json_ref) { counter++; });
+        CHECK_EQ(counter, 0);
+    }
+
+    // Scalar
+    {
+        json j {42};
+        int counter = 0;
+        j.for_each([& counter] (json_ref) { counter++; });
+        CHECK_EQ(counter, 0);
+    }
+
+    // Array
+    {
+        json j;
+        j.push_back(json{nullptr});
+        j.push_back(json{true});
+        j.push_back(json{42});
+
+        int counter = 0;
+        j.for_each([& counter] (json_ref) { counter++; });
+        CHECK_EQ(counter, 3);
+    }
+
+    // Array
+    {
+        json j;
+        j.push_back(json{42});
+        j.push_back(json{43});
+        j.push_back(json{44});
+
+        int counter = 42;
+        j.for_each([& counter] (json_ref r) { CHECK_EQ(counter++, r.template get<int>()); });
+        CHECK_EQ(counter, 45);
+    }
+
+    // Object
+    {
+        json j;
+        j["0"] = 42;
+        j["1"] = 43;
+        j["2"] = 44;
+
+        int counter = 42;
+        j.for_each([& counter] (json_ref r) { CHECK_EQ(counter++, r.template get<int>()); });
+        CHECK_EQ(counter, 45);
+    }
+}
+
+template <typename Backend>
 void run_serializer_tests ()
 {
     using json = jeyson::json<Backend>;
@@ -977,5 +1036,6 @@ TEST_CASE("JSON Jansson backend") {
     run_assignment_tests<jeyson::backend::jansson>();
     run_access_tests<jeyson::backend::jansson>();
     run_parsing_tests<jeyson::backend::jansson>();
+    run_algorithm_tests<jeyson::backend::jansson>();
     run_serializer_tests<jeyson::backend::jansson>();
 }

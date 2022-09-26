@@ -786,6 +786,23 @@ public:
 };
 
 ////////////////////////////////////////////////////////////////////////////////
+// Algorithm interface
+////////////////////////////////////////////////////////////////////////////////
+template <typename Derived, typename Backend>
+class algoritm_interface
+{
+public:
+    using reference = json_ref<Backend>;
+
+public:
+    /**
+     * Applies the given function object @a f to the references of all topmost
+     * elements of JSON value/reference.
+     */
+    JEYSON__EXPORT void for_each (std::function<void (reference)> f) const noexcept;
+};
+
+////////////////////////////////////////////////////////////////////////////////
 // JSON reference
 ////////////////////////////////////////////////////////////////////////////////
 template <typename Backend = backend::jansson>
@@ -797,6 +814,7 @@ class json_ref: public Backend::ref
     , public mutable_element_accessor_interface<json_ref<Backend>, Backend>
     , public element_accessor_interface<json_ref<Backend>, Backend>
     , public getter_interface<json_ref<Backend>, Backend>
+    , public algoritm_interface<json_ref<Backend>, Backend>
 {
     friend class json<Backend>;
     friend class mutable_element_accessor_interface<json_ref<Backend>, Backend>;
@@ -881,6 +899,7 @@ class json: public Backend::rep
     , public mutable_element_accessor_interface<json<Backend>, Backend>
     , public element_accessor_interface<json<Backend>, Backend>
     , public getter_interface<json<Backend>, Backend>
+    , public algoritm_interface<json<Backend>, Backend>
 {
 public:
     using rep_type        = typename Backend::rep;
