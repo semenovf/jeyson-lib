@@ -54,7 +54,8 @@ namespace backend {
 ////////////////////////////////////////////////////////////////////////////////
 // rep
 ////////////////////////////////////////////////////////////////////////////////
-jansson::rep::rep () = default;
+jansson::rep::rep () 
+{}
 
 jansson::rep::rep (rep const & other)
 {
@@ -92,7 +93,8 @@ inline void swap (jansson::rep & a, jansson::rep & b)
 ////////////////////////////////////////////////////////////////////////////////
 // ref
 ////////////////////////////////////////////////////////////////////////////////
-jansson::ref::ref () = default;
+jansson::ref::ref ()
+{}
 
 jansson::ref::ref (ref const & other)
 {
@@ -290,7 +292,8 @@ void push_back (json_t * arr, json_t * value)
 // Placed here to avoid error: specialization of ‘jeyson::json_ref<Backend>::~json_ref()
 // [with Backend = jeyson::backend::jansson]’ after instantiation
 template <>
-json_ref<BACKEND>::~json_ref () = default;
+json_ref<BACKEND>::~json_ref ()
+{}
 
 ////////////////////////////////////////////////////////////////////////////////
 // JSON value
@@ -305,10 +308,12 @@ json<BACKEND>::operator bool () const noexcept
 // Constructors, destructors, assignment operators
 //------------------------------------------------------------------------------
 template <>
-json<BACKEND>::json () = default;
+json<BACKEND>::json ()
+{}
 
 template <>
-json<BACKEND>::json (std::nullptr_t) : rep_type(json_null()) {}
+json<BACKEND>::json (std::nullptr_t) : rep_type(json_null())
+{}
 
 template <>
 json<BACKEND>::json (bool value) : rep_type(json_boolean(value))
@@ -328,23 +333,22 @@ json<BACKEND>::json (string_view const & value)
 {}
 
 // NOTE. MSVC 2019 (Checked with version 16.11.16):
-// error LNK2019: unresolved external symbol
-#if _MSC_VER
+// This code
+// 
+// template <>
+// json<BACKEND>::json (json const & other) = default;
+// 
+// is the cause of the error LNK2019: unresolved external symbol
 
 template <>
 json<BACKEND>::json (json const & other)
     : rep_type(other)
 {}
 
-#else
-
 template <>
-json<BACKEND>::json (json const & other) = default;
-
-#endif
-
-template <>
-json<BACKEND>::json(json && other) = default;
+json<BACKEND>::json (json && other)
+    : rep_type(std::move(other))
+{}
 
 template <>
 json<BACKEND>::json (json_ref<BACKEND> const & j)
@@ -360,7 +364,8 @@ json<BACKEND>::json (json_ref<BACKEND> && j)
 }
 
 template <>
-json<BACKEND>::~json () = default;
+json<BACKEND>::~json ()
+{}
 
 template <>
 json<BACKEND> & json<BACKEND>::operator = (json const & other)
@@ -576,13 +581,18 @@ operator == (json<BACKEND> const & lhs, json<BACKEND> const & rhs)
 // JSON reference
 ////////////////////////////////////////////////////////////////////////////////
 template <>
-json_ref<BACKEND>::json_ref () = default;
+json_ref<BACKEND>::json_ref ()
+{}
 
 template <>
-json_ref<BACKEND>::json_ref (json_ref const &) = default;
+json_ref<BACKEND>::json_ref (json_ref const & other)
+    : rep_type(other)
+{}
 
 template <>
-json_ref<BACKEND>::json_ref (json_ref &&) = default;
+json_ref<BACKEND>::json_ref (json_ref && other)
+    : rep_type(std::move(other))
+{}
 
 template <>
 json_ref<BACKEND>::json_ref (BACKEND::ref && other)
