@@ -48,11 +48,11 @@ if (JEYSON__ENABLE_JANSSON AND NOT TARGET jansson)
         portable_target(INCLUDE_DIRS ${STATIC_PROJECT_NAME} PRIVATE $<TARGET_PROPERTY:jansson,INCLUDE_DIRECTORIES>)
     endif()
 
-    list(APPEND _sources ${CMAKE_CURRENT_LIST_DIR}/src/jansson.cpp)
+    list(APPEND _jeyson__sources ${CMAKE_CURRENT_LIST_DIR}/src/jansson.cpp)
 endif()
 
 if (JEYSON__BUILD_SHARED)
-    portable_target(SOURCES ${PROJECT_NAME} ${_sources})
+    portable_target(SOURCES ${PROJECT_NAME} ${_jeyson__sources})
     portable_target(INCLUDE_DIRS ${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
     portable_target(LINK ${PROJECT_NAME} PUBLIC pfs::common)
 
@@ -62,7 +62,7 @@ if (JEYSON__BUILD_SHARED)
 endif()
 
 if (JEYSON__BUILD_STATIC)
-    portable_target(SOURCES ${STATIC_PROJECT_NAME} ${_sources})
+    portable_target(SOURCES ${STATIC_PROJECT_NAME} ${_jeyson__sources})
     portable_target(INCLUDE_DIRS ${STATIC_PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
     portable_target(LINK ${STATIC_PROJECT_NAME} PUBLIC pfs::common)
 
