@@ -10,7 +10,7 @@
 cmake_minimum_required (VERSION 3.11)
 project(jeyson C CXX)
 
-option(JEYSON__BUILD_SHARED "Enable build shared library" ON)
+option(JEYSON__BUILD_SHARED "Enable build shared library" OFF)
 option(JEYSON__BUILD_STATIC "Enable build static library" ON)
 option(JEYSON__ENABLE_JANSSON "Enable `Jansson` library for JSON support" ON)
 
