@@ -950,7 +950,7 @@ modifiers_interface<Derived, Backend>::push_back_helper (bool b)
     auto self = static_cast<Derived *>(this);
 
     if (!INATIVE(*self))
-        INATIVE(*self) = json_object();
+        INATIVE(*self) = json_array();
 
     backend::push_back(INATIVE(*self), json_boolean(b));
 }
@@ -965,7 +965,7 @@ modifiers_interface<Derived, Backend>::push_back_helper (std::intmax_t n)
     auto self = static_cast<Derived *>(this);
 
     if (!INATIVE(*self))
-        INATIVE(*self) = json_object();
+        INATIVE(*self) = json_array();
 
     backend::push_back(INATIVE(*self), json_integer(n));
 }
@@ -980,7 +980,7 @@ modifiers_interface<Derived, Backend>::push_back_helper (double n)
     auto self = static_cast<Derived *>(this);
 
     if (!INATIVE(*self))
-        INATIVE(*self) = json_object();
+        INATIVE(*self) = json_array();
 
     backend::push_back(INATIVE(*self), json_real(n));
 }
@@ -995,7 +995,7 @@ modifiers_interface<Derived, Backend>::push_back_helper (string_view const & s)
     auto self = static_cast<Derived *>(this);
 
     if (!INATIVE(*self))
-        INATIVE(*self) = json_object();
+        INATIVE(*self) = json_array();
 
     backend::push_back(INATIVE(*self), json_stringn_nocheck(s.data(), s.size()));
 }
@@ -1754,7 +1754,7 @@ template std::size_t getter_interface<JSON_REF, BACKEND>::object_size () const n
 ////////////////////////////////////////////////////////////////////////////////
 template <typename Derived, typename Backend>
 void
-algoritm_interface<Derived, Backend>::for_each (std::function<void (reference)> f) const noexcept
+algorithm_interface<Derived, Backend>::for_each (std::function<void (reference)> f) const noexcept
 {
     auto self = static_cast<Derived const *>(this);
 
@@ -1790,7 +1790,228 @@ algoritm_interface<Derived, Backend>::for_each (std::function<void (reference)> 
     }
 }
 
-template void algoritm_interface<JSON, BACKEND>::for_each (std::function<void (reference)> f) const noexcept;
-template void algoritm_interface<JSON_REF, BACKEND>::for_each (std::function<void (reference)> f) const noexcept;
+template void algorithm_interface<JSON, BACKEND>::for_each (std::function<void (reference)> f) const noexcept;
+template void algorithm_interface<JSON_REF, BACKEND>::for_each (std::function<void (reference)> f) const noexcept;
+
+////////////////////////////////////////////////////////////////////////////////
+// Iterator interface
+////////////////////////////////////////////////////////////////////////////////
+template <typename Derived, typename Backend>
+typename iterator_interface<Derived, Backend>::iterator
+iterator_interface<Derived, Backend>::begin () noexcept
+{
+    auto self = static_cast<Derived *>(this);
+
+    PFS__TERMINATE(INATIVE(*self), "iterator_interface::begin(): null pointer");
+
+    iterator it;
+    it._parent = INATIVE(*self);
+    it._index = 0;
+
+    if (json_is_object(INATIVE(*self)))
+        it._iter = json_object_iter(it._parent);
+
+    return it;
+}
+
+template <typename Derived, typename Backend>
+typename iterator_interface<Derived, Backend>::const_iterator
+iterator_interface<Derived, Backend>::begin () const noexcept
+{
+    auto self = static_cast<Derived const *>(this);
+
+    PFS__TERMINATE(CINATIVE(*self), "iterator_interface::begin(): null pointer");
+
+    const_iterator it;
+    it._parent = CINATIVE(*self);
+    it._index = 0;
+
+    if (json_is_object(CINATIVE(*self)))
+        it._iter = json_object_iter(it._parent);
+
+    return it;
+}
+
+template iterator_interface<JSON, BACKEND>::iterator iterator_interface<JSON, BACKEND>::begin () noexcept;
+template iterator_interface<JSON, BACKEND>::const_iterator iterator_interface<JSON, BACKEND>::begin () const noexcept;
+template iterator_interface<JSON_REF, BACKEND>::iterator iterator_interface<JSON_REF, BACKEND>::begin () noexcept;
+template iterator_interface<JSON_REF, BACKEND>::const_iterator iterator_interface<JSON_REF, BACKEND>::begin () const noexcept;
+
+template <typename Derived, typename Backend>
+typename iterator_interface<Derived, Backend>::iterator
+iterator_interface<Derived, Backend>::end () noexcept
+{
+    iterator it;
+    auto self = static_cast<Derived *>(this);
+
+    PFS__TERMINATE(INATIVE(*self), "iterator_interface::end(): null pointer");
+
+    it._parent = INATIVE(*self);
+
+    if (json_is_object(INATIVE(*self))) {
+        it._iter = nullptr;
+    } else if (json_is_array(INATIVE(*self))) {
+        it._index = json_array_size(INATIVE(*self));
+    } else {
+        it._index = 1;
+    }
+
+    return it;
+}
+
+template <typename Derived, typename Backend>
+typename iterator_interface<Derived, Backend>::const_iterator
+iterator_interface<Derived, Backend>::end () const noexcept
+{
+    const_iterator it;
+    auto self = static_cast<Derived const *>(this);
+
+    PFS__TERMINATE(CINATIVE(*self), "iterator_interface::end(): null pointer");
+
+    it._parent = CINATIVE(*self);
+
+    if (json_is_object(CINATIVE(*self))) {
+        it._iter = nullptr;
+    } else if (json_is_array(CINATIVE(*self))) {
+        it._index = json_array_size(CINATIVE(*self));
+    } else {
+        it._index = 1;
+    }
+
+    return it;
+}
+
+template iterator_interface<JSON, BACKEND>::iterator iterator_interface<JSON, BACKEND>::end () noexcept;
+template iterator_interface<JSON, BACKEND>::const_iterator iterator_interface<JSON, BACKEND>::end () const noexcept;
+template iterator_interface<JSON_REF, BACKEND>::iterator iterator_interface<JSON_REF, BACKEND>::end () noexcept;
+template iterator_interface<JSON_REF, BACKEND>::const_iterator iterator_interface<JSON_REF, BACKEND>::end () const noexcept;
+
+template <typename ValueType, typename RefType, typename Backend>
+template <typename U, typename V>
+basic_iterator<ValueType, RefType, Backend>::basic_iterator (basic_iterator<U, V, Backend> other)
+{
+    this->_parent = other._parent;
+    this->_index = other._index;
+    this->_iter = other._iter;
+}
+
+template basic_iterator<JSON const, JSON_REF const, BACKEND>::basic_iterator (basic_iterator<JSON, JSON_REF, BACKEND>);
+
+template <typename ValueType, typename RefType, typename Backend>
+bool basic_iterator<ValueType, RefType, Backend>::equals (basic_iterator<ValueType, RefType, Backend> const & other) const
+{
+    return this->_parent == other._parent
+        && this->_index == other._index
+        && this->_iter == other._iter;
+}
+
+template bool basic_iterator<JSON, JSON_REF, BACKEND>::equals (basic_iterator<JSON, JSON_REF, BACKEND> const & ) const;
+template bool basic_iterator<JSON const, JSON_REF const, BACKEND>::equals (basic_iterator<JSON const, JSON_REF const, BACKEND> const & ) const;
+
+template <typename ValueType, typename RefType, typename Backend>
+typename basic_iterator<ValueType, RefType, Backend>::reference
+basic_iterator<ValueType, RefType, Backend>::ref ()
+{
+    if (json_is_object(this->_parent)) {
+        if (this->_iter == nullptr)
+            throw error {errc::out_of_range};
+
+        json_t * ptr = json_object_iter_value(this->_iter);
+        char const * key = json_object_iter_key(this->_iter);
+        auto key_length = json_object_iter_key_len(this->_iter);
+
+        return reference{BACKEND::ref{ptr, this->_parent, BACKEND::key_type(key, key_length)}};
+    } else if (json_is_array(this->_parent)) {
+        auto ptr = json_array_get(this->_parent, this->_index);
+
+        if (!ptr)
+            throw error {errc::out_of_range};
+
+        return reference{BACKEND::ref{ptr, this->_parent, this->_index}};
+    }/* else { */
+        if (this->_index > 0)
+            throw error {errc::out_of_range};
+
+        return reference(typename Backend::ref{this->_parent, nullptr, BACKEND::size_type{0}});
+    /* } */
+}
+
+template basic_iterator<JSON, JSON_REF, BACKEND>::reference basic_iterator<JSON, JSON_REF, BACKEND>::ref ();
+template basic_iterator<JSON const, JSON_REF const, BACKEND>::reference basic_iterator<JSON const, JSON_REF const, BACKEND>::ref ();
+
+template <typename ValueType, typename RefType, typename Backend>
+void basic_iterator<ValueType, RefType, Backend>::increment (difference_type)
+{
+    if (json_is_object(this->_parent)) {
+        if (this->_iter == nullptr)
+            throw error {errc::out_of_range};
+
+        this->_iter = json_object_iter_next(this->_parent, this->_iter);
+    } else if (json_is_array(this->_parent)) {
+        if (this->_index > json_array_size(this->_parent))
+            throw error {errc::out_of_range};
+
+        ++this->_index;
+    } else {
+        if (this->_index == 0)
+            this->_index = 1;
+        else
+            throw error {errc::out_of_range};
+    }
+}
+
+template void basic_iterator<JSON, JSON_REF, BACKEND>::increment (difference_type);
+template void basic_iterator<JSON const, JSON_REF const, BACKEND>::increment (difference_type);
+
+template <typename ValueType, typename RefType, typename Backend>
+void basic_iterator<ValueType, RefType, Backend>::decrement (difference_type)
+{
+    if (json_is_object(this->_parent)) {
+            throw error {errc::incopatible_type};
+    } else if (json_is_array(this->_parent)) {
+        if (this->_index == 0)
+            throw error {errc::out_of_range};
+
+        --this->_index;
+    } else {
+        if (this->_index == 1)
+            this->_index = 0;
+        else
+            throw error {errc::out_of_range};
+    }
+}
+
+template void basic_iterator<JSON, JSON_REF, BACKEND>::decrement (difference_type);
+template void basic_iterator<JSON const, JSON_REF const, BACKEND>::decrement (difference_type);
+
+template <typename ValueType, typename RefType, typename Backend>
+bool basic_iterator<ValueType, RefType, Backend>::decrement_support () const
+{
+    if (json_is_object(this->_parent))
+        return false;
+
+    return true;
+}
+
+template bool basic_iterator<JSON, JSON_REF, BACKEND>::decrement_support () const;
+template bool basic_iterator<JSON const, JSON_REF const, BACKEND>::decrement_support () const;
+
+template <typename ValueType, typename RefType, typename Backend>
+typename basic_iterator<ValueType, RefType, Backend>::key_type
+basic_iterator<ValueType, RefType, Backend>::key () const
+{
+    if (!json_is_object(this->_parent))
+        throw error {errc::incopatible_type};
+
+    if (this->_iter == nullptr)
+        throw error {errc::out_of_range};
+
+    char const * key = json_object_iter_key(this->_iter);
+
+    return BACKEND::key_type(key);
+}
+
+template basic_iterator<JSON, JSON_REF, BACKEND>::key_type basic_iterator<JSON, JSON_REF, BACKEND>::key () const;
+template basic_iterator<JSON const, JSON_REF const, BACKEND>::key_type basic_iterator<JSON const, JSON_REF const, BACKEND>::key () const;
 
 } // namespace jeyson

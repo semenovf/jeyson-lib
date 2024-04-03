@@ -74,6 +74,16 @@ struct jansson
         ref (ref const &);
         ref (ref &&);
     };
+
+    class iterator_rep
+    {
+    public:
+        json_t * _parent {nullptr}; // For scalar, array and object iterators
+        size_type _index {0};       // For array iterator
+
+        // Used by object iterator, it is a return value of `json_object_iter(json_t *object)`.
+        void * _iter {nullptr};
+    };
 };
 
 }} // namespace jeyson::backend

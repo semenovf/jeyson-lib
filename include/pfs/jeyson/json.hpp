@@ -8,13 +8,14 @@
 //      2022.07.08 Fixed for MSVC.
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "pfs/jeyson/error.hpp"
-#include "pfs/jeyson/exports.hpp"
+#include "error.hpp"
+#include "exports.hpp"
+#include "backend/jansson.hpp"
 #include "pfs/filesystem.hpp"
+#include "pfs/iterator.hpp"
 #include "pfs/optional.hpp"
 #include "pfs/string_view.hpp"
 #include "pfs/type_traits.hpp"
-#include "backend/jansson.hpp"
 #include <string>
 #include <type_traits>
 #include <cstddef>
@@ -789,7 +790,7 @@ public:
 // Algorithm interface
 ////////////////////////////////////////////////////////////////////////////////
 template <typename Derived, typename Backend>
-class algoritm_interface
+class algorithm_interface
 {
 public:
     using reference = json_ref<Backend>;
@@ -800,6 +801,130 @@ public:
      * elements of JSON value/reference.
      */
     JEYSON__EXPORT void for_each (std::function<void (reference)> f) const noexcept;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Iterator interface
+////////////////////////////////////////////////////////////////////////////////
+template <typename ValueType, typename RefType, typename Backend>
+class basic_iterator : public pfs::iterator_facade<pfs::bidirectional_iterator_tag
+    , basic_iterator<ValueType, RefType, Backend>
+    , ValueType
+    , RefType *
+    , RefType
+    , std::ptrdiff_t>
+    , public Backend::iterator_rep
+{
+    using base_class = pfs::iterator_facade<pfs::bidirectional_iterator_tag
+        , basic_iterator<ValueType, RefType, Backend>
+        , ValueType
+        , RefType *
+        , RefType
+        , std::ptrdiff_t>;
+
+public:
+    using value_type = ValueType;
+    using key_type   = typename Backend::key_type;
+    using reference  = RefType;
+    using difference_type = typename base_class::difference_type;
+
+public:
+    using base_class::base_class;
+
+    template <typename U, typename V>
+    basic_iterator (basic_iterator<U, V, Backend>);
+
+    JEYSON__EXPORT bool equals (basic_iterator const & other) const;
+
+    /**
+     * @throw @c error { @c errc::out_of_range } if iterator is out of range.
+     */
+    JEYSON__EXPORT reference ref ();
+
+    /**
+     * @throw @c error { @c errc::out_of_range } if iterator is out of range.
+     */
+    JEYSON__EXPORT void increment (difference_type);
+
+    /**
+     * @throw @c error { @c errc::out_of_range } if iterator is out of range.
+     * @throw @c error { @c errc::incopatible_type } if iterator does not support this
+     *        operation (e.g. object iterator).
+     */
+    JEYSON__EXPORT void decrement (difference_type);
+
+    /**
+     * Checks if decrement is supported by this iterator.
+     */
+    JEYSON__EXPORT bool decrement_support () const;
+
+    /**
+     * @throw @c error { @c errc::incopatible_type } if iterator is not an object iterator.
+     * @throw @c error { @c errc::out_of_range } if iterator is out of range.
+     */
+    JEYSON__EXPORT key_type key () const;
+
+    JEYSON__EXPORT reference value ()
+    {
+        return ref();
+    }
+};
+
+template <typename Derived, typename Backend>
+class iterator_interface
+{
+public:
+    using iterator = basic_iterator<json<Backend>, json_ref<Backend>, Backend>;
+    using const_iterator = basic_iterator<json<Backend> const, json_ref<Backend> const, Backend>;
+    using reverse_iterator = std::reverse_iterator<iterator>;
+    using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+
+public:
+    JEYSON__EXPORT iterator begin () noexcept;
+    JEYSON__EXPORT const_iterator begin () const noexcept;
+
+    const_iterator cbegin () const noexcept
+    {
+        return begin();
+    }
+
+    JEYSON__EXPORT iterator end () noexcept;
+    JEYSON__EXPORT const_iterator end () const noexcept;
+
+    const_iterator cend () const noexcept
+    {
+        return end();
+    }
+
+    reverse_iterator rbegin () noexcept
+    {
+        return reverse_iterator{end()};
+    }
+
+    const_reverse_iterator rbegin () const noexcept
+    {
+        return const_reverse_iterator{end()};
+    }
+
+    const_reverse_iterator crbegin () const noexcept
+    {
+        return rbegin();
+    }
+
+    reverse_iterator rend () noexcept
+    {
+        return reverse_iterator{begin()};
+    }
+
+    const_reverse_iterator rend () const noexcept
+    {
+        return const_reverse_iterator{begin()};
+    }
+
+    const_reverse_iterator crend () const noexcept
+    {
+        return rend();
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -814,7 +939,8 @@ class json_ref: public Backend::ref
     , public mutable_element_accessor_interface<json_ref<Backend>, Backend>
     , public element_accessor_interface<json_ref<Backend>, Backend>
     , public getter_interface<json_ref<Backend>, Backend>
-    , public algoritm_interface<json_ref<Backend>, Backend>
+    , public algorithm_interface<json_ref<Backend>, Backend>
+    , public iterator_interface<json_ref<Backend>, Backend>
 {
     friend class json<Backend>;
     friend class mutable_element_accessor_interface<json_ref<Backend>, Backend>;
@@ -899,7 +1025,8 @@ class json: public Backend::rep
     , public mutable_element_accessor_interface<json<Backend>, Backend>
     , public element_accessor_interface<json<Backend>, Backend>
     , public getter_interface<json<Backend>, Backend>
-    , public algoritm_interface<json<Backend>, Backend>
+    , public algorithm_interface<json<Backend>, Backend>
+    , public iterator_interface<json<Backend>, Backend>
 {
 public:
     using rep_type        = typename Backend::rep;

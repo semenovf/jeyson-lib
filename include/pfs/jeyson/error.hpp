@@ -76,9 +76,6 @@ public:
             case static_cast<int>(errc::invalid_argument):
                 return std::string{"invalid argument"};
 
-//             case static_cast<int>(errc::type_error):
-//                 return std::string{"type error"};
-//
 //             case static_cast<int>(errc::type_cast_error):
 //                 return std::string{"type cast error"};
 //
