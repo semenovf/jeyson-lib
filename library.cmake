@@ -35,6 +35,10 @@ if (NOT TARGET pfs::common)
 endif()
 
 if (JEYSON__ENABLE_JANSSON)
+    if (NOT TARGET jansson)
+        portable_target(INCLUDE_PROJECT ${CMAKE_CURRENT_LIST_DIR}/3rdparty/jansson.cmake)
+    endif()
+
     list(APPEND _jeyson__sources ${CMAKE_CURRENT_LIST_DIR}/src/jansson.cpp)
 endif()
 
@@ -46,5 +50,6 @@ foreach(_target IN LISTS _jeyson__targets)
     if (JEYSON__ENABLE_JANSSON)
         portable_target(LINK ${_target} PRIVATE jansson)
         portable_target(INCLUDE_DIRS ${_target} PRIVATE $<TARGET_PROPERTY:jansson,INCLUDE_DIRECTORIES>)
+        portable_target(DEFINITIONS ${_target} PUBLIC JEYSON__JANSSON_ENABLED=1)
     endif()
 endforeach()
