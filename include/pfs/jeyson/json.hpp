@@ -1179,14 +1179,24 @@ public:
     // Parsing
     //--------------------------------------------------------------------------
     /**
-     * Decodes JSON from string
+     * Decodes JSON from string buffer.
      */
-    static JEYSON__EXPORT json parse (std::string const & source);
+    static JEYSON__EXPORT json parse (char const * source, std::size_t len, error * perr = nullptr);
 
     /**
-     * Decodes JSON from file
+     * Decodes JSON from string view.
      */
-    static JEYSON__EXPORT json parse (pfs::filesystem::path const & path);
+    static JEYSON__EXPORT json parse (string_view source, error * perr = nullptr);
+
+    /**
+     * Decodes JSON from string.
+     */
+    static JEYSON__EXPORT json parse (std::string const & source, error * perr = nullptr);
+
+    /**
+     * Decodes JSON from file.
+     */
+    static JEYSON__EXPORT json parse (pfs::filesystem::path const & path, error * perr = nullptr);
 };
 
 template <typename Backend>

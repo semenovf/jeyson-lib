@@ -517,18 +517,20 @@ void json<BACKEND>::save (pfs::filesystem::path const & path
 //------------------------------------------------------------------------------
 template <>
 json<BACKEND>
-json<BACKEND>::parse (std::string const & source)
+json<BACKEND>::parse (char const * source, std::size_t len, error * perr)
 {
     json_error_t jerror;
 
-    auto j = json_loads(source.c_str(), JSON_DECODE_ANY, & jerror);
+    auto j = json_loadb(source, len, JSON_DECODE_ANY, & jerror);
 
     if (!j) {
-        throw error {
+        pfs::throw_or(perr, error {
               errc::backend_error
             , fmt::format("parse error at line {}", jerror.line)
             , jerror.text
-        };
+        });
+
+        return json<BACKEND>{};
     }
 
     json<BACKEND> result;
@@ -539,7 +541,21 @@ json<BACKEND>::parse (std::string const & source)
 
 template <>
 json<BACKEND>
-json<BACKEND>::parse (pfs::filesystem::path const & path)
+json<BACKEND>::parse (string_view source, error * perr)
+{
+    return parse(source.data(), source.size(), perr);
+}
+
+template <>
+json<BACKEND>
+json<BACKEND>::parse (std::string const & source, error * perr)
+{
+    return parse(source.data(), source.size(), perr);
+}
+
+template <>
+json<BACKEND>
+json<BACKEND>::parse (pfs::filesystem::path const & path, error * perr)
 {
     json_error_t jerror;
 
@@ -550,12 +566,15 @@ json<BACKEND>::parse (pfs::filesystem::path const & path)
         , & jerror);
 
     if (!j) {
-        throw error {
+        pfs::throw_or(perr, error {
               errc::backend_error
             , fmt::format("parse error at line {} in file `{}`"
                 , jerror.line
                 , pfs::filesystem::utf8_encode(path))
-            , jerror.text};
+            , jerror.text
+        });
+
+        return json<BACKEND>{};
     }
 
     json<BACKEND> result;
