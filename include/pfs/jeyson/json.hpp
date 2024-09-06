@@ -831,6 +831,8 @@ public:
 public:
     using base_class::base_class;
 
+    basic_iterator () = default;
+
     template <typename U, typename V>
     basic_iterator (basic_iterator<U, V, Backend>);
 
