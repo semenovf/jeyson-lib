@@ -4,52 +4,66 @@
 # This file is part of `jeyson-lib`.
 #
 # Changelog:
-#      2022.02.07 Initial version.
-#      2023.02.10 Separated static and shared builds.
-#      2024.03.29 Replaced the sequence of two target configurations with a foreach statement.
+#       2022.02.07 Initial version.
+#       2023.02.10 Separated static and shared builds.
+#       2024.03.29 Replaced the sequence of two target configurations with a foreach statement.
+#       2024.11.23 Removed `portable_target` dependency.
 ################################################################################
-cmake_minimum_required (VERSION 3.11)
+cmake_minimum_required (VERSION 3.19)
 project(jeyson C CXX)
 
 option(JEYSON__BUILD_SHARED "Enable build shared library" OFF)
-option(JEYSON__BUILD_STATIC "Enable build static library" ON)
 option(JEYSON__ENABLE_JANSSON "Enable `Jansson` library for JSON support" ON)
 
-if (NOT PORTABLE_TARGET__CURRENT_PROJECT_DIR)
-    set(PORTABLE_TARGET__CURRENT_PROJECT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-endif()
-
 if (JEYSON__BUILD_SHARED)
-    portable_target(ADD_SHARED ${PROJECT_NAME} ALIAS pfs::jeyson EXPORTS JEYSON__EXPORTS)
-    list(APPEND _jeyson__targets ${PROJECT_NAME})
+    add_library(jeyson SHARED)
+    target_compile_definitions(jeyson PRIVATE JEYSON__EXPORTS)
+else()
+    add_library(jeyson STATIC)
+    target_compile_definitions(jeyson PRIVATE JEYSON__STATIC)
 endif()
 
-if (JEYSON__BUILD_STATIC)
-    set(STATIC_PROJECT_NAME ${PROJECT_NAME}-static)
-    portable_target(ADD_STATIC ${STATIC_PROJECT_NAME} ALIAS pfs::jeyson::static EXPORTS JEYSON__STATIC)
-    list(APPEND _jeyson__targets ${STATIC_PROJECT_NAME})
-endif()
+add_library(pfs::jeyson ALIAS jeyson)
 
 if (NOT TARGET pfs::common)
-    portable_target(INCLUDE_PROJECT ${CMAKE_CURRENT_LIST_DIR}/2ndparty/common/library.cmake)
+    set(FETCHCONTENT_UPDATES_DISCONNECTED_COMMON ON)
+
+    include(FetchContent)
+    FetchContent_Declare(common
+        GIT_REPOSITORY https://github.com/semenovf/common-lib.git
+        GIT_TAG master
+        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/2ndparty/common
+        SUBBUILD_DIR ${CMAKE_CURRENT_BINARY_DIR}/2ndparty/common)
+    FetchContent_MakeAvailable(common)
 endif()
 
 if (JEYSON__ENABLE_JANSSON)
-    if (NOT TARGET jansson)
-        portable_target(INCLUDE_PROJECT ${CMAKE_CURRENT_LIST_DIR}/3rdparty/jansson.cmake)
-    endif()
+    set(FETCHCONTENT_UPDATES_DISCONNECTED_JANSSON ON)
+
+    set(JANSSON_BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries")
+    set(JANSSON_BUILD_DOCS    OFF CACHE BOOL "Disable build Jansson docs")
+    set(JANSSON_EXAMPLES      OFF CACHE BOOL "Disable compile example applications")
+    set(JANSSON_COVERAGE      OFF CACHE BOOL "Disable coverage support")
+    set(JANSSON_WITHOUT_TESTS ON  CACHE BOOL "Disable tests")
+    set(JANSSON_INSTALL       OFF CACHE BOOL "Disable installation")
+
+    include(FetchContent)
+    FetchContent_Declare(jansson
+        GIT_REPOSITORY https://github.com/akheron/jansson.git
+        GIT_TAG v2.14
+        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/jansson
+        SUBBUILD_DIR ${CMAKE_CURRENT_BINARY_DIR}/3rdparty/jansson)
+    FetchContent_MakeAvailable(jansson)
 
     list(APPEND _jeyson__sources ${CMAKE_CURRENT_LIST_DIR}/src/jansson.cpp)
 endif()
 
-foreach(_target IN LISTS _jeyson__targets)
-    portable_target(SOURCES ${_target} ${_jeyson__sources})
-    portable_target(INCLUDE_DIRS ${_target} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
-    portable_target(LINK ${_target} PUBLIC pfs::common)
+target_sources(jeyson PRIVATE ${_jeyson__sources})
+target_include_directories(jeyson PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
+target_link_libraries(jeyson PUBLIC pfs::common)
 
-    if (JEYSON__ENABLE_JANSSON)
-        portable_target(LINK ${_target} PRIVATE jansson)
-        portable_target(INCLUDE_DIRS ${_target} PRIVATE $<TARGET_PROPERTY:jansson,INCLUDE_DIRECTORIES>)
-        portable_target(DEFINITIONS ${_target} PUBLIC JEYSON__JANSSON_ENABLED=1)
-    endif()
-endforeach()
+if (JEYSON__ENABLE_JANSSON)
+    target_link_libraries(jeyson PRIVATE jansson)
+    target_include_directories(jeyson PRIVATE $<TARGET_PROPERTY:jansson,INCLUDE_DIRECTORIES>)
+    target_compile_definitions(jeyson PUBLIC JEYSON__JANSSON_ENABLED=1)
+endif()

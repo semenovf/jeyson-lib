@@ -1,13 +1,7 @@
-/3rdparty/*
-!/3rdparty/download.sh
-!/3rdparty/README.md
-!/3rdparty/*.cmake
-
-/2ndparty/*
-!/2ndparty/download.sh
-!/2ndparty/update.sh
-
 !.gitignore
+
+/2ndparty
+/3rdparty
 
 .settings/
 .vs/
@@ -23,10 +17,6 @@ nbproject/
 src/tmp/
 
 .coveralls.yml
-#Makefile
-#Makefile.*
-#makefile
-#makefile.*
 *.kdev4
 *.make
 *.mk
@@ -38,7 +28,6 @@ src/tmp/
 ~*
 *~
 *.bak
-#*.map
 *.sdf
 *.slo
 *.lo
