@@ -15,12 +15,15 @@
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
+#include "pfs/filesystem.hpp"
 #include "pfs/fmt.hpp"
 #include "pfs/jeyson/json.hpp"
 #include "pfs/jeyson/backend/jansson.hpp"
 #include "pfs/optional.hpp"
 #include <array>
 #include <vector>
+
+namespace fs = pfs::filesystem;
 
 template <typename Backend>
 void run_basic_tests ()
@@ -916,9 +919,13 @@ void run_parsing_tests ()
     }
 
     {
-        auto j1 = json::parse(pfs::filesystem::utf8_decode("data/twitter.json"));
-        auto j2 = json::parse(pfs::filesystem::utf8_decode("data/canada.json"));
-        auto j3 = json::parse(pfs::filesystem::utf8_decode("data/citm_catalog.json"));
+        auto popts = doctest::getContextOptions();
+        auto program = fs::path(fs::utf8_decode(popts->binary_name.c_str()));
+        auto program_dir = program.parent_path();
+
+        auto j1 = json::parse(program_dir / fs::utf8_decode("data/twitter.json"));
+        auto j2 = json::parse(program_dir / fs::utf8_decode("data/canada.json"));
+        auto j3 = json::parse(program_dir / fs::utf8_decode("data/citm_catalog.json"));
 
         REQUIRE(j1);
         REQUIRE(j2);
