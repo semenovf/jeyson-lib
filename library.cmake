@@ -59,7 +59,8 @@ if (JEYSON__ENABLE_JANSSON)
 endif()
 
 target_sources(jeyson PRIVATE ${_jeyson__sources})
-target_include_directories(jeyson PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
+target_include_directories(jeyson PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include
+    PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include/pfs)
 target_link_libraries(jeyson PUBLIC pfs::common)
 
 if (JEYSON__ENABLE_JANSSON)

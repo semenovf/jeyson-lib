@@ -7,11 +7,11 @@
 //      2022.02.07 Initial version.
 //      2022.07.08 Fixed for MSVC.
 ////////////////////////////////////////////////////////////////////////////////
-#include "pfs/jeyson/json.hpp"
-#include "pfs/jeyson/error.hpp"
-#include "pfs/jeyson/backend/jansson.hpp"
-#include "pfs/assert.hpp"
-#include "pfs/fmt.hpp"
+#include "jeyson/json.hpp"
+#include "jeyson/error.hpp"
+#include "jeyson/backend/jansson.hpp"
+#include <pfs/assert.hpp>
+#include <pfs/i18n.hpp>
 #include <jansson.h>
 #include <algorithm>
 #include <limits>
@@ -54,7 +54,7 @@ namespace backend {
 ////////////////////////////////////////////////////////////////////////////////
 // rep
 ////////////////////////////////////////////////////////////////////////////////
-jansson::rep::rep () 
+jansson::rep::rep ()
 {}
 
 jansson::rep::rep (rep const & other)
@@ -201,7 +201,7 @@ void swap (jansson::ref & a, jansson::ref & b)
 void assign (jansson::rep & rep, json_t * value)
 {
     if (!value)
-        throw error {errc::invalid_argument, "attempt to assign null value"};
+        throw error {make_error_code(std::errc::invalid_argument), tr::_("attempt to assign null value")};
 
     if (rep._ptr) {
         json_decref(rep._ptr);
@@ -215,7 +215,7 @@ void assign (jansson::rep & rep, json_t * value)
 void assign (jansson::ref & ref, json_t * value)
 {
     if (!value)
-        throw error {errc::invalid_argument, "attempt to assign null value"};
+        throw error {make_error_code(std::errc::invalid_argument), tr::_("attempt to assign null value")};
 
     if (ref._ptr) {
         json_decref(ref._ptr);
@@ -228,7 +228,7 @@ void assign (jansson::ref & ref, json_t * value)
             auto rc = json_array_set(ref._parent, ref._index.i, value);
 
             if (rc != 0)
-                throw error {errc::backend_error, "replace array element failure"};
+                throw error {make_error_code(pfs::errc::backend_error), tr::_("replace array element failure")};
 
             // Not need `json_incref(value)`, we use non-steal variant of
             // `json_array_set()` function
@@ -240,13 +240,13 @@ void assign (jansson::ref & ref, json_t * value)
                 , value);
 
             if (rc != 0)
-                throw error {errc::backend_error, "replace object element failure"};
+                throw error {make_error_code(pfs::errc::backend_error), tr::_("replace object element failure")};
 
             // Not need `json_incref(value)`, we use non-steal variant of
             // `json_object_setn_nocheck()` function
             ref._ptr = value;
         } else {
-            throw error {errc::incopatible_type, "array or object expected for parent"};
+            throw error {make_error_code(errc::incopatible_type), tr::_("array or object expected for parent")};
         }
     } else {
         ref._ptr = value;
@@ -257,31 +257,30 @@ void assign (jansson::ref & ref, json_t * value)
 void insert (json_t * obj, string_view const & key, json_t * value)
 {
     if (!value)
-        throw error {errc::invalid_argument, "attempt to insert null value"};
+        throw error {make_error_code(std::errc::invalid_argument), tr::_("attempt to insert null value")};
 
     if (!json_is_object(obj))
-        throw error {errc::incopatible_type, "object expected"};
+        throw error {make_error_code(errc::incopatible_type), tr::_("object expected")};
 
     auto rc = json_object_setn_new_nocheck(obj, key.data(), key.size(), value);
 
     if (rc != 0)
-        throw error {errc::backend_error, "object insertion failure"};
+        throw error {make_error_code(pfs::errc::backend_error), tr::_("object insertion failure")};
 }
 
 // value must be a new reference
 void push_back (json_t * arr, json_t * value)
 {
     if (!value)
-        throw error {errc::invalid_argument
-            , "attempt to push back null value"};
+        throw error {make_error_code(std::errc::invalid_argument), tr::_("attempt to push back null value")};
 
     if (!json_is_array(arr))
-        throw error {errc::incopatible_type, "array expected"};
+        throw error {make_error_code(errc::incopatible_type), tr::_("array expected")};
 
     auto rc = json_array_append_new(arr, value);
 
     if (rc != 0)
-        throw error {errc::backend_error, "array append failure"};
+        throw error {make_error_code(pfs::errc::backend_error), tr::_("array append failure")};
 }
 
 } // namespace backend
@@ -334,10 +333,10 @@ json<BACKEND>::json (string_view const & value)
 
 // NOTE. MSVC 2019 (Checked with version 16.11.16):
 // This code
-// 
+//
 // template <>
 // json<BACKEND>::json (json const & other) = default;
-// 
+//
 // is the cause of the error LNK2019: unresolved external symbol
 
 template <>
@@ -505,8 +504,8 @@ void json<BACKEND>::save (pfs::filesystem::path const & path
 
     if (rc < 0) {
         throw error {
-              errc::backend_error
-            , fmt::format("save JSON representation to file `{}` failure"
+              make_error_code(pfs::errc::backend_error)
+            , tr::f_("save JSON representation to file failure: {}"
                 , pfs::filesystem::utf8_encode(path))
         };
     }
@@ -524,11 +523,8 @@ json<BACKEND>::parse (char const * source, std::size_t len, error * perr)
     auto j = json_loadb(source, len, JSON_DECODE_ANY, & jerror);
 
     if (!j) {
-        pfs::throw_or(perr, error {
-              errc::backend_error
-            , fmt::format("parse error at line {}", jerror.line)
-            , jerror.text
-        });
+        pfs::throw_or(perr, make_error_code(pfs::errc::backend_error)
+            , tr::f_("parse error at line {}: {}", jerror.line, jerror.text));
 
         return json<BACKEND>{};
     }
@@ -566,13 +562,11 @@ json<BACKEND>::parse (pfs::filesystem::path const & path, error * perr)
         , & jerror);
 
     if (!j) {
-        pfs::throw_or(perr, error {
-              errc::backend_error
-            , fmt::format("parse error at line {} in file `{}`"
+        pfs::throw_or(perr, make_error_code(pfs::errc::backend_error)
+            , tr::f_("parse error at {}:{}: {}"
                 , jerror.line
-                , pfs::filesystem::utf8_encode(path))
-            , jerror.text
-        });
+                , pfs::filesystem::utf8_encode(path)
+                , jerror.text));
 
         return json<BACKEND>{};
     }
@@ -893,18 +887,18 @@ modifiers_interface<Derived, Backend>::insert_helper (string_view const & key
     auto self = static_cast<Derived *>(this);
 
     if (!value)
-        throw error {errc::invalid_argument, "attempt to insert unitialized value"};
+        throw error {make_error_code(std::errc::invalid_argument), tr::_("attempt to insert unitialized value")};
 
     if (!INATIVE(*self))
         INATIVE(*self) = json_object();
 
     if (!json_is_object(INATIVE(*self)))
-        throw error {errc::incopatible_type, "object expected"};
+        throw error {make_error_code(errc::incopatible_type), tr::_("object expected")};
 
     auto copy = json_deep_copy(NATIVE(value));
 
     if (!copy)
-        throw error {errc::backend_error, "deep copy failure"};
+        throw error {make_error_code(pfs::errc::backend_error), tr::_("deep copy failure")};
 
     auto rc = json_object_setn_new_nocheck(INATIVE(*self)
         , key.data()
@@ -912,7 +906,7 @@ modifiers_interface<Derived, Backend>::insert_helper (string_view const & key
         , copy);
 
     if (rc != 0)
-        throw error {errc::backend_error, "object insertion failure"};
+        throw error {make_error_code(pfs::errc::backend_error), tr::_("object insertion failure")};
 }
 
 template void modifiers_interface<JSON, BACKEND>::insert_helper (string_view const &, value_type const &);
@@ -925,13 +919,13 @@ modifiers_interface<Derived, Backend>::insert (key_type const & key, value_type 
     auto self = static_cast<Derived *>(this);
 
     if (!value)
-        throw error {errc::invalid_argument, "attempt to insert unitialized value"};
+        throw error {make_error_code(std::errc::invalid_argument), tr::_("attempt to insert unitialized value")};
 
     if (!INATIVE(*self))
         INATIVE(*self) = json_object();
 
     if (!json_is_object(INATIVE(*self)))
-        throw error {errc::incopatible_type, "object expected"};
+        throw error {make_error_code(errc::incopatible_type), tr::_("object expected")};
 
     auto rc = json_object_setn_new_nocheck(INATIVE(*self)
         , key.c_str()
@@ -939,7 +933,7 @@ modifiers_interface<Derived, Backend>::insert (key_type const & key, value_type 
         , NATIVE(value));
 
     if (rc != 0)
-        throw error {errc::backend_error, "object insertion failure"};
+        throw error {make_error_code(pfs::errc::backend_error), tr::_("object insertion failure")};
 
     NATIVE(value) = nullptr;
 }
@@ -1029,23 +1023,23 @@ modifiers_interface<Derived, Backend>::push_back_helper (value_type const & valu
     auto self = static_cast<Derived *>(this);
 
     if (!value)
-        throw error {errc::invalid_argument, "attempt to add unitialized value"};
+        throw error {make_error_code(std::errc::invalid_argument), tr::_("attempt to add unitialized value")};
 
     if (! INATIVE(*self))
         INATIVE(*self) = json_array();
 
     if (!json_is_array(INATIVE(*self)))
-        throw error {errc::incopatible_type, "array expected"};
+        throw error {make_error_code(errc::incopatible_type), tr::_("array expected")};
 
     auto copy = json_deep_copy(NATIVE(value));
 
     if (!copy)
-        throw error {errc::backend_error, "deep copy failure"};
+        throw error {make_error_code(pfs::errc::backend_error), tr::_("deep copy failure")};
 
     auto rc = json_array_append_new(INATIVE(*self), copy);
 
     if (rc != 0)
-        throw error {errc::backend_error, "array append failure"};
+        throw error {make_error_code(pfs::errc::backend_error), tr::_("array append failure")};
 }
 
 template void modifiers_interface<JSON, BACKEND>::push_back_helper (value_type const &);
@@ -1058,18 +1052,18 @@ modifiers_interface<Derived, Backend>::push_back (value_type && value)
     auto self = static_cast<Derived *>(this);
 
     if (!value)
-        throw error {errc::invalid_argument, "attempt to add unitialized value"};
+        throw error {make_error_code(std::errc::invalid_argument), tr::_("attempt to add unitialized value")};
 
     if (! INATIVE(*self))
         INATIVE(*self) = json_array();
 
     if (!json_is_array(INATIVE(*self)))
-        throw error {errc::incopatible_type, "array expected"};
+        throw error {make_error_code(errc::incopatible_type), tr::_("array expected")};
 
     auto rc = json_array_append_new(INATIVE(*self), NATIVE(value));
 
     if (rc != 0)
-        throw error {errc::backend_error, "array append failure"};
+        throw error {make_error_code(pfs::errc::backend_error), tr::_("array append failure")};
 
     NATIVE(value) = nullptr;
 }
@@ -1125,7 +1119,7 @@ converter_interface<Derived>::to_string () const
             , json_dump_callback, & result, JSON_COMPACT | JSON_ENCODE_ANY);
 
         if (rc != 0)
-            throw error {errc::backend_error, "stringification failure"};
+            throw error {make_error_code(pfs::errc::backend_error), tr::_("stringification failure")};
     }
 
     return result;
@@ -1636,12 +1630,12 @@ element_accessor_interface<Derived, Backend>::at (size_type pos) const
     auto self = static_cast<Derived const *>(this);
 
     if (!CINATIVE(*self) || !json_is_array(CINATIVE(*self)))
-        throw error {errc::incopatible_type, "array expected"};
+        throw error {make_error_code(errc::incopatible_type), tr::_("array expected")};
 
     auto ptr = json_array_get(CINATIVE(*self), pos);
 
     if (!ptr)
-        throw error {errc::out_of_range};
+        throw error {make_error_code(std::errc::result_out_of_range)};
 
     return reference{BACKEND::ref{ptr, CINATIVE(*self), pos}};
 }
@@ -1656,12 +1650,12 @@ element_accessor_interface<Derived, Backend>::at (string_view key) const
     auto self = static_cast<Derived const *>(this);
 
     if (!CINATIVE(*self) || !json_is_object(CINATIVE(*self)))
-        throw error {errc::incopatible_type, "object expected"};
+        throw error {make_error_code(errc::incopatible_type), tr::_("object expected")};
 
     auto ptr = json_object_getn(CINATIVE(*self), key.data(), key.length());
 
     if (!ptr)
-        throw error {errc::out_of_range};
+        throw error {make_error_code(std::errc::result_out_of_range)};
 
     return reference{BACKEND::ref{ptr, CINATIVE(*self)
         , key_type(key.data(), key.length())}};
@@ -1933,7 +1927,7 @@ basic_iterator<ValueType, RefType, Backend>::ref ()
 {
     if (json_is_object(this->_parent)) {
         if (this->_iter == nullptr)
-            throw error {errc::out_of_range};
+            throw error {make_error_code(std::errc::result_out_of_range)};
 
         json_t * ptr = json_object_iter_value(this->_iter);
         char const * key = json_object_iter_key(this->_iter);
@@ -1944,12 +1938,12 @@ basic_iterator<ValueType, RefType, Backend>::ref ()
         auto ptr = json_array_get(this->_parent, this->_index);
 
         if (!ptr)
-            throw error {errc::out_of_range};
+            throw error {make_error_code(std::errc::result_out_of_range)};
 
         return reference{BACKEND::ref{ptr, this->_parent, this->_index}};
     }/* else { */
         if (this->_index > 0)
-            throw error {errc::out_of_range};
+            throw error {make_error_code(std::errc::result_out_of_range)};
 
         return reference(typename Backend::ref{this->_parent, nullptr, BACKEND::size_type{0}});
     /* } */
@@ -1963,19 +1957,19 @@ void basic_iterator<ValueType, RefType, Backend>::increment (difference_type)
 {
     if (json_is_object(this->_parent)) {
         if (this->_iter == nullptr)
-            throw error {errc::out_of_range};
+            throw error {make_error_code(std::errc::result_out_of_range)};
 
         this->_iter = json_object_iter_next(this->_parent, this->_iter);
     } else if (json_is_array(this->_parent)) {
         if (this->_index > json_array_size(this->_parent))
-            throw error {errc::out_of_range};
+            throw error {make_error_code(std::errc::result_out_of_range)};
 
         ++this->_index;
     } else {
         if (this->_index == 0)
             this->_index = 1;
         else
-            throw error {errc::out_of_range};
+            throw error {make_error_code(std::errc::result_out_of_range)};
     }
 }
 
@@ -1986,17 +1980,17 @@ template <typename ValueType, typename RefType, typename Backend>
 void basic_iterator<ValueType, RefType, Backend>::decrement (difference_type)
 {
     if (json_is_object(this->_parent)) {
-            throw error {errc::incopatible_type};
+            throw error {make_error_code(errc::incopatible_type)};
     } else if (json_is_array(this->_parent)) {
         if (this->_index == 0)
-            throw error {errc::out_of_range};
+            throw error {make_error_code(std::errc::result_out_of_range)};
 
         --this->_index;
     } else {
         if (this->_index == 1)
             this->_index = 0;
         else
-            throw error {errc::out_of_range};
+            throw error {make_error_code(std::errc::result_out_of_range)};
     }
 }
 
@@ -2020,10 +2014,10 @@ typename basic_iterator<ValueType, RefType, Backend>::key_type
 basic_iterator<ValueType, RefType, Backend>::key () const
 {
     if (!json_is_object(this->_parent))
-        throw error {errc::incopatible_type};
+        throw error {make_error_code(errc::incopatible_type)};
 
     if (this->_iter == nullptr)
-        throw error {errc::out_of_range};
+        throw error {make_error_code(std::errc::result_out_of_range)};
 
     char const * key = json_object_iter_key(this->_iter);
 

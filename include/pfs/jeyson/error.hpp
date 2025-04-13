@@ -26,12 +26,7 @@ enum class errc
 //     , bad_member_name
 //     , bad_json_sequence
 
-    , backend_error
-
-    , out_of_range
     , incopatible_type
-    , invalid_argument
-    , overflow
 };
 
 class error_category : public std::error_category
@@ -64,23 +59,8 @@ public:
 //             case static_cast<int>(errc::bad_json_sequence):
 //                 return std::string{"bad json sequence"};
 
-            case static_cast<int>(errc::backend_error):
-                return std::string{"backend error"};
-
-            case static_cast<int>(errc::out_of_range):
-                return std::string{"out of range"};
-
             case static_cast<int>(errc::incopatible_type):
                 return std::string{"incopatible type"};
-
-            case static_cast<int>(errc::invalid_argument):
-                return std::string{"invalid argument"};
-
-//             case static_cast<int>(errc::type_cast_error):
-//                 return std::string{"type cast error"};
-//
-//             case static_cast<int>(errc::null_pointer):
-//                 return std::string{"null pointer"};
 
             default: return std::string{"unknown JSON error"};
         }
@@ -102,21 +82,6 @@ class error: public pfs::error
 {
 public:
     using pfs::error::error;
-
-    error (errc ec)
-        : pfs::error(make_error_code(ec))
-    {}
-
-    error (errc ec
-        , std::string const & description
-        , std::string const & cause)
-        : pfs::error(make_error_code(ec), description, cause)
-    {}
-
-    error (errc ec
-        , std::string const & description)
-        : pfs::error(make_error_code(ec), description)
-    {}
 };
 
 } // namespace jeyson
