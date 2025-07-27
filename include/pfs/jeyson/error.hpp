@@ -34,7 +34,7 @@ class error_category : public std::error_category
 public:
     virtual char const * name () const noexcept override
     {
-        return "jeyson::error_category";
+        return "pfs::jeyson::category";
     }
 
     virtual std::string message (int ev) const override

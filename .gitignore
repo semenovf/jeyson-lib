@@ -1,54 +1,22 @@
 !.gitignore
 
-/2ndparty
-/3rdparty
+!/2ndparty/
+/2ndparty/*
+!/2ndparty/CMakeLists.txt
 
-.settings/
-.vs/
-.vscode/
-.build*/
-build*/
-.kdev4/
-.idea/
-.project
-.cproject
-doxygen/
-nbproject/
-src/tmp/
+!/3rdparty/
+/3rdparty/*
+!/3rdparty/CMakeLists.txt
 
-.coveralls.yml
+### KDevelop ###
 *.kdev4
-*.make
-*.mk
-*.exe
-*.err
-*.lk*
-*.sym
-*.swp
-~*
-*~
-*.bak
-*.sdf
-*.slo
-*.lo
-*.pdb
-*.idb
-*.o
-*.obj
-*.so
-*.dll
-*.so.*
-*.dylib
-*.lib
-*.lai
-*.la
-*.a
-*.exe
-*.out
-*.app
-*.log
-moc_*.cpp
-qrc_*.cpp
-.sconsign.dblite
-Doxyget.err
-CMakeSettings.json
+.kdev4/
+
+### Visual Studio ###
+.vs/
+/out/
+/CMakeSettings.json
+
+### VSCode
+.vscode/
+/build/

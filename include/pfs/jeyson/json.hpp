@@ -763,7 +763,7 @@ public:
         auto result = get<T>(success);
 
         if (!success)
-            throw error {errc::incopatible_type};
+            throw error { make_error_code(errc::incopatible_type) };
 
         return result;
     }

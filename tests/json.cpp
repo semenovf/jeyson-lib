@@ -920,12 +920,12 @@ void run_parsing_tests ()
 
     {
         auto popts = doctest::getContextOptions();
-        auto program = fs::path(fs::utf8_decode(popts->binary_name.c_str()));
+        auto program = fs::path(pfs::utf8_decode_path(popts->binary_name.c_str()));
         auto program_dir = program.parent_path();
 
-        auto j1 = json::parse(program_dir / fs::utf8_decode("data/twitter.json"));
-        auto j2 = json::parse(program_dir / fs::utf8_decode("data/canada.json"));
-        auto j3 = json::parse(program_dir / fs::utf8_decode("data/citm_catalog.json"));
+        auto j1 = json::parse(program_dir / pfs::utf8_decode_path("data/twitter.json"));
+        auto j2 = json::parse(program_dir / pfs::utf8_decode_path("data/canada.json"));
+        auto j3 = json::parse(program_dir / pfs::utf8_decode_path("data/citm_catalog.json"));
 
         REQUIRE(j1);
         REQUIRE(j2);
