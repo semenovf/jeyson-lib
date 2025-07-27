@@ -499,14 +499,13 @@ void json<BACKEND>::save (pfs::filesystem::path const & path
         flags |= JSON_REAL_PRECISION(precision);
 
     auto rc = json_dump_file(NATIVE(*this)
-        , pfs::filesystem::utf8_encode(path).c_str()
+        , pfs::utf8_encode_path(path).c_str()
         , flags);
 
     if (rc < 0) {
         throw error {
               make_error_code(pfs::errc::backend_error)
-            , tr::f_("save JSON representation to file failure: {}"
-                , pfs::filesystem::utf8_encode(path))
+            , tr::f_("save JSON representation to file failure: {}", pfs::utf8_encode_path(path))
         };
     }
 }
@@ -555,7 +554,7 @@ json<BACKEND>::parse (pfs::filesystem::path const & path, error * perr)
 {
     json_error_t jerror;
 
-    auto j = json_load_file(pfs::filesystem::utf8_encode(path).c_str()
+    auto j = json_load_file(pfs::utf8_encode_path(path).c_str()
         ,     JSON_DECODE_ANY
             | JSON_REJECT_DUPLICATES
             | JSON_ALLOW_NUL
@@ -565,7 +564,7 @@ json<BACKEND>::parse (pfs::filesystem::path const & path, error * perr)
         pfs::throw_or(perr, make_error_code(pfs::errc::backend_error)
             , tr::f_("parse error at {}:{}: {}"
                 , jerror.line
-                , pfs::filesystem::utf8_encode(path)
+                , pfs::utf8_encode_path(path)
                 , jerror.text));
 
         return json<BACKEND>{};
