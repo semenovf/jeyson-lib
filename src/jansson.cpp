@@ -1633,8 +1633,12 @@ element_accessor_interface<Derived, Backend>::at (size_type pos) const
 
     auto ptr = json_array_get(CINATIVE(*self), pos);
 
-    if (!ptr)
-        throw error {make_error_code(std::errc::result_out_of_range)};
+    if (!ptr) {
+        throw error {
+              make_error_code(std::errc::invalid_argument)
+            , tr::f_("index is out of bounds: {}", pos)
+        };
+    }
 
     return reference{BACKEND::ref{ptr, CINATIVE(*self), pos}};
 }
@@ -1654,7 +1658,10 @@ element_accessor_interface<Derived, Backend>::at (string_view key) const
     auto ptr = json_object_getn(CINATIVE(*self), key.data(), key.length());
 
     if (!ptr)
-        throw error {make_error_code(std::errc::result_out_of_range)};
+        throw error {
+              make_error_code(std::errc::invalid_argument)
+            , tr::f_("bad key: {}", pfs::to_string(key))
+        };
 
     return reference{BACKEND::ref{ptr, CINATIVE(*self)
         , key_type(key.data(), key.length())}};
