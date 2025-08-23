@@ -8,7 +8,7 @@
 ################################################################################
 
 if (JEYSON__ENABLE_JANSSON)
-    if (JEYSON__DISABLE_FETCH_CONTENT AND EXISTS jansson/.git)
+    if (JEYSON__DISABLE_FETCH_CONTENT AND EXISTS ${CMAKE_CURRENT_LIST_DIR}/jansson/.git)
         add_subdirectory(jansson 3rdparty/jansson)
     else()
         set(JANSSON_BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries")
@@ -17,7 +17,7 @@ if (JEYSON__ENABLE_JANSSON)
         set(JANSSON_COVERAGE      OFF CACHE BOOL "Disable coverage support")
         set(JANSSON_WITHOUT_TESTS ON  CACHE BOOL "Disable tests")
         set(JANSSON_INSTALL       OFF CACHE BOOL "Disable installation")
-    
+
         set(FETCHCONTENT_UPDATES_DISCONNECTED_JANSSON ON)
         message(STATUS "Fetching jansson ...")
         include(FetchContent)
