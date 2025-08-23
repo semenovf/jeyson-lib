@@ -7,16 +7,17 @@
 #       2025.07.27 Initial version
 ################################################################################
 
+set(JANSSON_BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries")
+set(JANSSON_EXAMPLES      OFF CACHE BOOL "Disable compile example applications")
+set(JANSSON_COVERAGE      OFF CACHE BOOL "Disable coverage support")
+set(JANSSON_WITHOUT_TESTS ON  CACHE BOOL "Disable tests")
+set(JANSSON_INSTALL       OFF CACHE BOOL "Disable installation")
+option(JANSSON_BUILD_DOCS "Disable build Jansson docs" OFF)
+
 if (JEYSON__ENABLE_JANSSON)
     if (JEYSON__DISABLE_FETCH_CONTENT AND EXISTS ${CMAKE_CURRENT_LIST_DIR}/jansson/.git)
         add_subdirectory(jansson 3rdparty/jansson)
     else()
-        set(JANSSON_BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries")
-        set(JANSSON_BUILD_DOCS    OFF CACHE BOOL "Disable build Jansson docs")
-        set(JANSSON_EXAMPLES      OFF CACHE BOOL "Disable compile example applications")
-        set(JANSSON_COVERAGE      OFF CACHE BOOL "Disable coverage support")
-        set(JANSSON_WITHOUT_TESTS ON  CACHE BOOL "Disable tests")
-        set(JANSSON_INSTALL       OFF CACHE BOOL "Disable installation")
 
         set(FETCHCONTENT_UPDATES_DISCONNECTED_JANSSON ON)
         message(STATUS "Fetching jansson ...")

@@ -10,8 +10,8 @@ include(FetchContent)
 
 foreach (_dep common)
     if (NOT TARGET pfs::${_dep})
-        if (GRIOTTE__DISABLE_FETCH_CONTENT AND EXISTS ${CMAKE_CURRENT_LIST_DIR}/${_dep}/.git)
-            add_subdirectory(${_dep})
+        if (JEYSON__DISABLE_FETCH_CONTENT AND EXISTS ${CMAKE_CURRENT_LIST_DIR}/${_dep}/.git)
+            add_subdirectory(${_dep} 2ndparty/${_dep})
         else()
             message(STATUS "Fetching ${_dep} ...")
             FetchContent_Declare(${_dep}
