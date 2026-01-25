@@ -1,5 +1,5 @@
 ################################################################################
-# Copyright (c) 2019-2024 Vladislav Trifochkin
+# Copyright (c) 2019-2026 Vladislav Trifochkin
 #
 # This file is part of `jeyson-lib`.
 #
@@ -9,6 +9,7 @@
 #       2024.03.29 Replaced the sequence of two target configurations with a foreach statement.
 #       2024.11.23 Removed `portable_target` dependency.
 #       2025.07.27 Moved building dependencies to 2ndparty and 3rdparty directories.
+#       2026.01.25 Set POSITION_INDEPENDENT_CODE to static library.
 ################################################################################
 cmake_minimum_required (VERSION 3.19)
 project(jeyson C CXX)
@@ -19,13 +20,14 @@ if (JEYSON__BUILD_SHARED)
 else()
     add_library(jeyson STATIC)
     target_compile_definitions(jeyson PRIVATE JEYSON__STATIC)
+    set_target_properties(jeyson PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 endif()
 
 add_library(pfs::jeyson ALIAS jeyson)
 
 target_include_directories(jeyson PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include
     PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include/pfs)
-    
+
 target_link_libraries(jeyson PUBLIC pfs::common)
 
 if (JEYSON__ENABLE_JANSSON)
