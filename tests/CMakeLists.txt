@@ -12,7 +12,7 @@
 project(jeyson-TESTS CXX)
 
 # Copy test files to build folder
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION ${CMAKE_BINARY_DIR}/output)
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 set(TESTS json iterator)
 

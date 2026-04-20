@@ -24,7 +24,7 @@ if (JEYSON__ENABLE_JANSSON)
         include(FetchContent)
         FetchContent_Declare(jansson
             GIT_REPOSITORY https://github.com/akheron/jansson.git
-            GIT_TAG v2.14.1
+            GIT_TAG v2.15.0
             SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/jansson)
         FetchContent_MakeAvailable(jansson)
         message(STATUS "Fetching jansson complete")
